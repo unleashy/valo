@@ -1,6 +1,3 @@
 ﻿namespace Valo.App.ViewModels;
 
-public partial class MainWindowViewModel : ViewModelBase
-{
-    public string Greeting { get; } = "Welcome to Avalonia!";
-}
+public class MainWindowViewModel : ViewModelBase {}

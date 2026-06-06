@@ -1,17 +1,37 @@
-<Window xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:vm="using:Valo.App.ViewModels"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
-        x:Class="Valo.App.Views.MainWindow"
-        x:DataType="vm:MainWindowViewModel"
-        Title="Valo.App">
-    <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
-        <vm:MainWindowViewModel/>
-    </Design.DataContext>
+<Window
+  xmlns="https://github.com/avaloniaui"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  xmlns:vm="using:Valo.App.ViewModels"
+  xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+  xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+  xmlns:l="clr-namespace:Valo.App.Lang"
+  xmlns:valo="clr-namespace:Valo.App"
+  mc:Ignorable="d"
+  x:Class="Valo.App.Views.MainWindow"
+  x:DataType="vm:MainWindowViewModel"
 
-    <TextBlock Text="{Binding Greeting}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+  Title="{x:Static l:Resources.AppTitle}"
+  Width="320"
+  Height="240"
+  MinWidth="160"
+  MinHeight="144"
+  WindowStartupLocation="CenterScreen"
+
+  KeyDown="InputElement_OnKeyDown"
+>
+  <Design.DataContext>
+    <vm:MainWindowViewModel />
+  </Design.DataContext>
+
+  <DockPanel>
+    <Menu DockPanel.Dock="Top">
+      <MenuItem Header="{x:Static l:Resources.Menu_File}">
+        <MenuItem Header="{x:Static l:Resources.Menu_Open}" />
+        <Separator />
+        <MenuItem Header="{x:Static l:Resources.Menu_Exit}" Click="ExitOnClick" />
+      </MenuItem>
+    </Menu>
+
+    <valo:GameScreen Name="GameScreen" Focusable="True" />
+  </DockPanel>
 </Window>

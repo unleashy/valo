@@ -1,5 +1,6 @@
 ﻿using Avalonia;
 
+[assembly: System.Resources.NeutralResourcesLanguage("en")]
 namespace Valo.App;
 
 internal static class Program
