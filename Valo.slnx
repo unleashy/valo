@@ -1,3 +1,5 @@
 <Solution>
   <Project Path="Valo.App/Valo.App.csproj" />
+  <Project Path="Valo.Tests/Valo.Tests.csproj" />
+  <Project Path="Valo/Valo.csproj" />
 </Solution>

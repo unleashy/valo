@@ -43,4 +43,8 @@
       <StronglyTypedClassName>Resources</StronglyTypedClassName>
     </EmbeddedResource>
   </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Valo\Valo.csproj" />
+  </ItemGroup>
 </Project>
