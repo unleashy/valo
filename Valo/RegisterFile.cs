@@ -37,7 +37,7 @@ public enum FlagsBit
     C,
 }
 
-public struct RegisterFile
+public sealed class RegisterFile
 {
     [InlineArray((int)Register16.SP + 2)]
     private struct Storage
@@ -49,13 +49,13 @@ public struct RegisterFile
 
     public byte this[Register8 reg]
     {
-        readonly get => _storage[(int)reg];
+        get => _storage[(int)reg];
         set => _storage[(int)reg] = value;
     }
 
     public ushort this[Register16 reg]
     {
-        readonly get {
+        get {
             var start = (int)reg;
             var end = start + 2;
 
@@ -70,7 +70,7 @@ public struct RegisterFile
         }
     }
 
-    public readonly bool GetFlag(FlagsBit bit)
+    public bool GetFlag(FlagsBit bit)
     {
         var flags = this[Register8.F];
 
