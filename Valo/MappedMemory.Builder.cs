@@ -9,6 +9,11 @@ public partial class MappedMemory
         private ImmutableArray<Allocation>.Builder _map =
             ImmutableArray.CreateBuilder<Allocation>();
 
+        public Builder Map(ushort start, ISizedMemory memory)
+        {
+            return Map(start, (ushort)(start + memory.Size), memory);
+        }
+
         public Builder Map(ushort start, ushort end, IMemory memory)
         {
             if (start >= end) {

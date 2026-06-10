@@ -1,4 +1,6 @@
-﻿namespace Valo;
+﻿using System.Diagnostics;
+
+namespace Valo;
 
 public sealed class Cpu
 {
@@ -53,6 +55,138 @@ public sealed class Cpu
                     break;
                 }
 
+                case Op.LoadReg8IndHL: {
+                    _reg[Register8.Z] = _mem.Read(_reg[Register16.HL]);
+                    yield return false;
+
+                    _reg[(Register8)instr.Dst] = _reg[Register8.Z];
+                    break;
+                }
+
+                case Op.LoadIndHLReg8: {
+                    _mem.Write(_reg[Register16.HL], _reg[(Register8)instr.Src]);
+                    yield return false;
+
+                    break;
+                }
+
+                case Op.LoadIndHLImm8: {
+                    _reg[Register8.Z] = _mem.Read(_reg[Register16.PC]++);
+                    yield return false;
+
+                    _mem.Write(_reg[Register16.HL], _reg[Register8.Z]);
+                    yield return false;
+
+                    break;
+                }
+
+                case Op.LoadAInd16: {
+                    _reg[Register8.Z] = _mem.Read(_reg[(Register16)instr.Src]);
+                    yield return false;
+
+                    _reg[Register8.A] = _reg[Register8.Z];
+                    break;
+                }
+
+                case Op.LoadInd16A: {
+                    _mem.Write(_reg[(Register16)instr.Dst], _reg[Register8.A]);
+                    yield return false;
+
+                    break;
+                }
+
+                case Op.LoadDir16A: {
+                    _reg[Register8.Z] = _mem.Read(_reg[Register16.PC]++);
+                    yield return false;
+
+                    _reg[Register8.W] = _mem.Read(_reg[Register16.PC]++);
+                    yield return false;
+
+                    _mem.Write(_reg[Register16.WZ], _reg[Register8.A]);
+                    yield return false;
+
+                    break;
+                }
+
+                case Op.LoadADir16: {
+                    _reg[Register8.Z] = _mem.Read(_reg[Register16.PC]++);
+                    yield return false;
+
+                    _reg[Register8.W] = _mem.Read(_reg[Register16.PC]++);
+                    yield return false;
+
+                    _reg[Register8.Z] = _mem.Read(_reg[Register16.WZ]);
+                    yield return false;
+
+                    _reg[Register8.A] = _reg[Register8.Z];
+                    break;
+                }
+
+                case Op.LoadAIndHigh: {
+                    _reg[Register8.Z] = _mem.Read((ushort)(0xFF00 | _reg[Register8.C]));
+                    yield return false;
+
+                    _reg[Register8.A] = _reg[Register8.Z];
+                    break;
+                }
+
+                case Op.LoadIndHighA: {
+                    _mem.Write((ushort)(0xFF00 | _reg[Register8.C]), _reg[Register8.A]);
+                    yield return false;
+
+                    break;
+                }
+
+                case Op.LoadADirHigh: {
+                    _reg[Register8.Z] = _mem.Read(_reg[Register16.PC]++);
+                    yield return false;
+
+                    _reg[Register8.Z] = _mem.Read((ushort)(0xFF00 | _reg[Register8.Z]));
+                    yield return false;
+
+                    _reg[Register8.A] = _reg[Register8.Z];
+                    break;
+                }
+
+                case Op.LoadDirHighA: {
+                    _reg[Register8.Z] = _mem.Read(_reg[Register16.PC]++);
+                    yield return false;
+
+                    _mem.Write((ushort)(0xFF00 | _reg[Register8.Z]), _reg[Register8.A]);
+                    yield return false;
+                    break;
+                }
+
+                case Op.LoadAIncHL: {
+                    _reg[Register8.Z] = _mem.Read(_reg[Register16.HL]++);
+                    yield return false;
+
+                    _reg[Register8.A] = _reg[Register8.Z];
+                    break;
+                }
+
+                case Op.LoadADecHL: {
+                    _reg[Register8.Z] = _mem.Read(_reg[Register16.HL]--);
+                    yield return false;
+
+                    _reg[Register8.A] = _reg[Register8.Z];
+                    break;
+                }
+
+                case Op.LoadIncHLA: {
+                    _mem.Write(_reg[Register16.HL]++, _reg[Register8.A]);
+                    yield return false;
+
+                    break;
+                }
+
+                case Op.LoadDecHLA: {
+                    _mem.Write(_reg[Register16.HL]--, _reg[Register8.A]);
+                    yield return false;
+
+                    break;
+                }
+
                 default: {
                     throw new NotImplementedException(
                         $"Missing implementation for operation {instr.Op}"
@@ -74,9 +208,24 @@ file enum Op
     NoOp,
     LoadReg8,
     LoadImm8,
+    LoadReg8IndHL,
+    LoadIndHLReg8,
+    LoadIndHLImm8,
+    LoadAInd16,
+    LoadInd16A,
+    LoadDir16A,
+    LoadADir16,
+    LoadAIndHigh,
+    LoadIndHighA,
+    LoadADirHigh,
+    LoadDirHighA,
+    LoadAIncHL,
+    LoadIncHLA,
+    LoadADecHL,
+    LoadDecHLA,
 }
 
-file readonly record struct Instruction(Op Op, byte Dst, byte Src)
+file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Src = byte.MaxValue)
 {
     public static Instruction Decode(byte opcode)
     {
@@ -84,28 +233,62 @@ file readonly record struct Instruction(Op Op, byte Dst, byte Src)
 
         switch (block) {
             case 0b00: {
-                var subblock = (byte)(opcode & 0b111);
+                var subblock = (byte)(opcode & 0b1111);
 
                 switch (subblock) {
-                    case 0b000: {
-                        var operand = (byte)((opcode >> 3) & 0b111);
-                        if (operand == 0b000) {
-                            // No operation
-                            // 7 6 5 4 3 2 1 0
-                            // 0 0 0 0 0 0 0 0
-                            return new Instruction(Op.NoOp, 0, 0);
-                        }
-
-                        break;
+                    case 0b0000: {
+                        // No operation
+                        // 7 6 5 4 3 2 1 0
+                        // 0 0 0 0 0 0 0 0
+                        return new Instruction(Op.NoOp);
                     }
 
-                    case 0b110: {
-                        // Load register8 from immediate8
-                        // 7 6  5 4 3  2 1 0
-                        // 0 0  [dst]  1 1 0
+                    case 0b0010: {
+                        // Load indirect16 from A
+                        // 7 6  5 4    3 2 1 0
+                        // 0 0  [dst]  0 0 1 0
+                        var operand = (byte)((opcode >> 4) & 0b11);
+
+                        return operand switch {
+                            0b00 => new Instruction(Op.LoadInd16A, Dst: (byte) Register16.BC),
+                            0b01 => new Instruction(Op.LoadInd16A, Dst: (byte) Register16.DE),
+                            0b10 => new Instruction(Op.LoadIncHLA),
+                            0b11 => new Instruction(Op.LoadDecHLA),
+                            _    => throw new UnreachableException(),
+                        };
+                    }
+
+                    case 0b1010: {
+                        // Load A from indirect16
+                        // 7 6  5 4    3 2 1 0
+                        // 0 0  [src]  1 0 1 0
+                        var operand = (byte)((opcode >> 4) & 0b11);
+
+                        return operand switch {
+                            0b00 => new Instruction(Op.LoadAInd16, Src: (byte) Register16.BC),
+                            0b01 => new Instruction(Op.LoadAInd16, Src: (byte) Register16.DE),
+                            0b10 => new Instruction(Op.LoadAIncHL),
+                            0b11 => new Instruction(Op.LoadADecHL),
+                            _    => throw new UnreachableException(),
+                        };
+                    }
+
+                    case 0b0110:
+                    case 0b1110: {
                         var dst = (byte)((opcode >> 3) & 0b111);
 
-                        return new Instruction(Op.LoadImm8, ToReg8(dst), 0);
+                        if (dst == 0b110) {
+                            // Load indirect HL from immediate8
+                            // 7 6  5 4 3  2 1 0
+                            // 0 0  1 1 0  1 1 0
+                            return new Instruction(Op.LoadIndHLImm8);
+                        }
+                        else {
+                            // Load register8 from immediate8
+                            // 7 6  5 4 3  2 1 0
+                            // 0 0  [dst]  1 1 0
+                            return new Instruction(Op.LoadImm8, ToReg8(dst));
+                        }
                     }
 
                     default: break;
@@ -115,13 +298,77 @@ file readonly record struct Instruction(Op Op, byte Dst, byte Src)
             }
 
             case 0b01: {
-                // Load register8 from register8
-                // 7 6  5 4 3  2 1 0
-                // 0 1  [dst]  [src]
                 var dst = (byte)((opcode >> 3) & 0b111);
                 var src = (byte)(opcode & 0b111);
 
-                return new Instruction(Op.LoadReg8, ToReg8(dst), ToReg8(src));
+                if (src == 0b110) {
+                    // Load register8 from indirect HL
+                    // 7 6  5 4 3  2 1 0
+                    // 0 1  [dst]  1 1 0
+                    return new Instruction(Op.LoadReg8IndHL, ToReg8(dst));
+                }
+                else if (dst == 0b110) {
+                    // Load indirect HL from register8
+                    // 7 6  5 4 3  2 1 0
+                    // 0 1  1 1 0  [src]
+                    return new Instruction(Op.LoadIndHLReg8, Src: ToReg8(src));
+                }
+                else {
+                    // Load register8 from register8
+                    // 7 6  5 4 3  2 1 0
+                    // 0 1  [dst]  [src]
+                    return new Instruction(Op.LoadReg8, ToReg8(dst), ToReg8(src));
+                }
+            }
+
+            case 0b11: {
+                switch (opcode & 0b111111) {
+                    case 0b101010: {
+                        // Load direct immediate16 from A
+                        // 7 6 5 4 3 2 1 0
+                        // 1 1 1 0 1 0 1 0
+                        return new Instruction(Op.LoadDir16A);
+                    }
+
+                    case 0b111010: {
+                        // Load A from direct immediate16
+                        // 7 6 5 4 3 2 1 0
+                        // 1 1 1 1 1 0 1 0
+                        return new Instruction(Op.LoadADir16);
+                    }
+
+                    case 0b110010: {
+                        // Load A from indirect $FF00 + C
+                        // 7 6 5 4 3 2 1 0
+                        // 1 1 1 1 0 0 1 0
+                        return new Instruction(Op.LoadAIndHigh);
+                    }
+
+                    case 0b100010: {
+                        // Load indirect $FF00 + C from A
+                        // 7 6 5 4 3 2 1 0
+                        // 1 1 1 0 0 0 1 0
+                        return new Instruction(Op.LoadIndHighA);
+                    }
+
+                    case 0b110000: {
+                        // Load A from indirect $FF00 + immediate
+                        // 7 6 5 4 3 2 1 0
+                        // 1 1 1 1 0 0 0 0
+                        return new Instruction(Op.LoadADirHigh);
+                    }
+
+                    case 0b100000: {
+                        // Load indirect $FF00 + immediate from A
+                        // 7 6 5 4 3 2 1 0
+                        // 1 1 1 0 0 0 0 0
+                        return new Instruction(Op.LoadDirHighA);
+                    }
+
+                    default: break;
+                }
+
+                break;
             }
 
             default: break;

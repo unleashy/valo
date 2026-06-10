@@ -2,7 +2,7 @@
 
 namespace Valo;
 
-public sealed class Rom(ImmutableArray<byte> bytes) : IMemory
+public sealed class Rom(ImmutableArray<byte> bytes) : ISizedMemory
 {
     public byte Read(ushort address) => bytes[address];
 
@@ -12,4 +12,6 @@ public sealed class Rom(ImmutableArray<byte> bytes) : IMemory
             $"Write to read-only memory at address ${address:X4} with value {value}"
         );
     }
+
+    public ushort Size => (ushort)bytes.Length;
 }

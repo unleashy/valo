@@ -1,6 +1,6 @@
 ﻿namespace Valo;
 
-public sealed class Ram(byte[] bytes) : IMemory
+public sealed class Ram(byte[] bytes) : ISizedMemory
 {
     public byte Read(ushort address) => bytes[address];
 
@@ -8,4 +8,6 @@ public sealed class Ram(byte[] bytes) : IMemory
     {
         bytes[address] = value;
     }
+
+    public ushort Size => (ushort)bytes.Length;
 }
