@@ -12,13 +12,12 @@ public class CpuTests
     {
         var opcode =
             (byte)(0b01_000_000 | (EncodeStdRegister8(dst) << 3) | EncodeStdRegister8(src));
-        var registers = new RegisterFile { [src] = 0x42 };
-        var sut = new Cpu(registers, new Rom([opcode, 0]));
+        var sut = new Cpu(new RegisterFile { [src] = 0x42 }, new Rom([opcode, 0]));
 
         var cycles = sut.Step();
 
         Assert.Multiple(() => {
-            Assert.That(registers[dst], Is.EqualTo(registers[src]));
+            Assert.That(sut.Registers[dst], Is.EqualTo(sut.Registers[src]));
             Assert.That(cycles, Is.EqualTo(1));
         });
     }
@@ -27,14 +26,12 @@ public class CpuTests
     public void LoadRegisterImmediate([ValueSource(nameof(StdRegister8))] Register8 dst)
     {
         var opcode = (byte)(0b00_000_110 | (EncodeStdRegister8(dst) << 3));
-        var registers = new RegisterFile();
-        var rom = new Rom([opcode, 0x67, 0]);
-        var sut = new Cpu(registers, rom);
+        var sut = new Cpu(new RegisterFile(), new Rom([opcode, 0x67, 0]));
 
         var cycles = sut.Step();
 
         Assert.Multiple(() => {
-            Assert.That(registers[dst], Is.EqualTo(rom.Read(1)));
+            Assert.That(sut.Registers[dst], Is.EqualTo(sut.Memory.Read(1)));
             Assert.That(cycles, Is.EqualTo(2));
         });
     }

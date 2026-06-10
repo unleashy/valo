@@ -2,7 +2,7 @@
 
 public sealed class Cpu
 {
-    private readonly RegisterFile _reg;
+    private RegisterFile _reg;
     private readonly IMemory _mem;
     private readonly IEnumerator<bool> _executor;
 
@@ -64,6 +64,9 @@ public sealed class Cpu
             yield return true;
         }
     }
+
+    public RegisterFile Registers => _reg;
+    public IMemory Memory => _mem;
 }
 
 file enum Op
