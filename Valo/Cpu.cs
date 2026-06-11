@@ -8,6 +8,7 @@ public sealed class Cpu
     private readonly IMemory _mem;
     private readonly IEnumerator<bool> _executor;
 
+
     public Cpu(RegisterFile reg, IMemory mem)
     {
         _reg = reg;
@@ -27,6 +28,9 @@ public sealed class Cpu
         _executor.MoveNext();
         return _executor.Current;
     }
+
+    public RegisterFile Registers => _reg;
+    public IMemory Memory => _mem;
 
     private IEnumerator<bool> Executor()
     {
@@ -187,6 +191,61 @@ public sealed class Cpu
                     break;
                 }
 
+                case Op.LoadImm16: {
+                    _reg[Register8.Z] = _mem.Read(_reg[Register16.PC]++);
+                    yield return false;
+
+                    _reg[Register8.W] = _mem.Read(_reg[Register16.PC]++);
+                    yield return false;
+
+                    _reg[(Register16)instr.Dst] = _reg[Register16.WZ];
+                    break;
+                }
+
+                case Op.LoadInd16SP: {
+                    _reg[Register8.Z] = _mem.Read(_reg[Register16.PC]++);
+                    yield return false;
+
+                    _reg[Register8.W] = _mem.Read(_reg[Register16.PC]++);
+                    yield return false;
+
+                    _mem.Write(_reg[Register16.WZ]++, _reg[Register8.SPL]);
+                    yield return false;
+
+                    _mem.Write(_reg[Register16.WZ], _reg[Register8.SPH]);
+                    yield return false;
+                    break;
+                }
+
+                case Op.LoadHLAdjustedSP: {
+                    _reg[Register8.Z] = _mem.Read(_reg[Register16.PC]++);
+                    yield return false;
+
+                    _reg[Register8.L] = Add(
+                        _reg[Register8.SPL],
+                        _reg[Register8.Z],
+                        out var carry,
+                        out var halfCarry
+                    );
+                    _reg.SetFlag(FlagsBit.Z, false);
+                    _reg.SetFlag(FlagsBit.N, false);
+                    _reg.SetFlag(FlagsBit.H, halfCarry);
+                    _reg.SetFlag(FlagsBit.C, carry);
+                    yield return false;
+
+                    var adj = _reg[Register8.Z] > sbyte.MaxValue ? byte.MaxValue : 0;
+                    _reg[Register8.H] = (byte)(_reg[Register8.SPH] + adj + (carry ? 1 : 0));
+
+                    break;
+                }
+
+                case Op.LoadSPHL: {
+                    _reg[Register16.SP] = _reg[Register16.HL];
+                    yield return false;
+
+                    break;
+                }
+
                 default: {
                     throw new NotImplementedException(
                         $"Missing implementation for operation {instr.Op}"
@@ -199,8 +258,14 @@ public sealed class Cpu
         }
     }
 
-    public RegisterFile Registers => _reg;
-    public IMemory Memory => _mem;
+    private static byte Add(byte a, byte b, out bool carry, out bool halfCarry)
+    {
+        var result = a + b;
+        halfCarry = ((a ^ b ^ result) & 0x10) == 0x10;
+        carry = result > byte.MaxValue;
+
+        return (byte)result;
+    }
 }
 
 file enum Op
@@ -223,6 +288,10 @@ file enum Op
     LoadIncHLA,
     LoadADecHL,
     LoadDecHLA,
+    LoadImm16,
+    LoadInd16SP,
+    LoadHLAdjustedSP,
+    LoadSPHL,
 }
 
 file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Src = byte.MaxValue)
@@ -243,6 +312,15 @@ file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Sr
                         return new Instruction(Op.NoOp);
                     }
 
+                    case 0b0001: {
+                        // Load register16 from immediate16
+                        // 7 6   5 4   3 2 1 0
+                        // 0 0  [dst]  0 0 0 1
+                        var dst = (byte)((opcode >> 4) & 0b11);
+
+                        return new Instruction(Op.LoadImm16, ToReg16(dst));
+                    }
+
                     case 0b0010: {
                         // Load indirect16 from A
                         // 7 6  5 4    3 2 1 0
@@ -256,6 +334,13 @@ file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Sr
                             0b11 => new Instruction(Op.LoadDecHLA),
                             _    => throw new UnreachableException(),
                         };
+                    }
+
+                    case 0b1000: {
+                        // Load SP from indirect immediate16
+                        // 7 6  5 4  3 2 1 0
+                        // 0 0  0 0  1 0 0 0
+                        return new Instruction(Op.LoadInd16SP);
                     }
 
                     case 0b1010: {
@@ -325,43 +410,57 @@ file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Sr
                 switch (opcode & 0b111111) {
                     case 0b101010: {
                         // Load direct immediate16 from A
-                        // 7 6 5 4 3 2 1 0
-                        // 1 1 1 0 1 0 1 0
+                        // 7 6  5 4 3 2 1 0
+                        // 1 1  1 0 1 0 1 0
                         return new Instruction(Op.LoadDir16A);
+                    }
+
+                    case 0b111000: {
+                        // Load HL from adjusted SP
+                        // 7 6  5 4 3 2 1 0
+                        // 1 1  1 1 1 0 0 0
+                        return new Instruction(Op.LoadHLAdjustedSP);
+                    }
+
+                    case 0b111001: {
+                        // Load SP from HL
+                        // 7 6  5 4 3 2 1 0
+                        // 1 1  1 1 1 0 0 1
+                        return new Instruction(Op.LoadSPHL);
                     }
 
                     case 0b111010: {
                         // Load A from direct immediate16
-                        // 7 6 5 4 3 2 1 0
-                        // 1 1 1 1 1 0 1 0
+                        // 7 6  5 4 3 2 1 0
+                        // 1 1  1 1 1 0 1 0
                         return new Instruction(Op.LoadADir16);
                     }
 
                     case 0b110010: {
                         // Load A from indirect $FF00 + C
-                        // 7 6 5 4 3 2 1 0
-                        // 1 1 1 1 0 0 1 0
+                        // 7 6  5 4 3 2 1 0
+                        // 1 1  1 1 0 0 1 0
                         return new Instruction(Op.LoadAIndHigh);
                     }
 
                     case 0b100010: {
                         // Load indirect $FF00 + C from A
-                        // 7 6 5 4 3 2 1 0
-                        // 1 1 1 0 0 0 1 0
+                        // 7 6  5 4 3 2 1 0
+                        // 1 1  1 0 0 0 1 0
                         return new Instruction(Op.LoadIndHighA);
                     }
 
                     case 0b110000: {
                         // Load A from indirect $FF00 + immediate
-                        // 7 6 5 4 3 2 1 0
-                        // 1 1 1 1 0 0 0 0
+                        // 7 6  5 4 3 2 1 0
+                        // 1 1  1 1 0 0 0 0
                         return new Instruction(Op.LoadADirHigh);
                     }
 
                     case 0b100000: {
                         // Load indirect $FF00 + immediate from A
-                        // 7 6 5 4 3 2 1 0
-                        // 1 1 1 0 0 0 0 0
+                        // 7 6  5 4 3 2 1 0
+                        // 1 1  1 0 0 0 0 0
                         return new Instruction(Op.LoadDirHighA);
                     }
 
@@ -378,14 +477,23 @@ file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Sr
 
         static byte ToReg8(byte placeholder) =>
             placeholder switch {
-                0 => (byte) Register8.B,
-                1 => (byte) Register8.C,
-                2 => (byte) Register8.D,
-                3 => (byte) Register8.E,
-                4 => (byte) Register8.H,
-                5 => (byte) Register8.L,
-                7 => (byte) Register8.A,
+                0 => (byte)Register8.B,
+                1 => (byte)Register8.C,
+                2 => (byte)Register8.D,
+                3 => (byte)Register8.E,
+                4 => (byte)Register8.H,
+                5 => (byte)Register8.L,
+                7 => (byte)Register8.A,
                 _ => throw new ArgumentException($"Not a Register8 placeholder: {placeholder}"),
+            };
+
+        static byte ToReg16(byte placeholder) =>
+            placeholder switch {
+                0 => (byte)Register16.BC,
+                1 => (byte)Register16.DE,
+                2 => (byte)Register16.HL,
+                3 => (byte)Register16.SP,
+                _ => throw new ArgumentException($"Not a Register16 placeholder: {placeholder}"),
             };
     }
 }

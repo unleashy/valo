@@ -14,6 +14,7 @@ public enum Register8
     W = 9, Z = 8,
     IR = 10,
     IME = 11,
+    SPH = 15, SPL = 14,
 }
 
 [SuppressMessage("ReSharper", "InconsistentNaming")]

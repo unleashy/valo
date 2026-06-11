@@ -20,6 +20,8 @@ public class RegisterFileTests
            Assert.That(sut[Register8.Z], Is.Zero);
            Assert.That(sut[Register8.IR], Is.Zero);
            Assert.That(sut[Register8.IME], Is.Zero);
+           Assert.That(sut[Register8.SPL], Is.Zero);
+           Assert.That(sut[Register8.SPH], Is.Zero);
 
            Assert.That(sut[Register16.AF], Is.Zero);
            Assert.That(sut[Register16.BC], Is.Zero);
@@ -48,6 +50,8 @@ public class RegisterFileTests
         sut[Register8.Z] = 0xBB;
         sut[Register8.IR] = 0xCC;
         sut[Register8.IME] = 0x01;
+        sut[Register8.SPH] = 0x20;
+        sut[Register8.SPL] = 0x30;
 
         Assert.Multiple(() => {
             Assert.That(sut[Register8.A], Is.EqualTo(0x12));
@@ -62,12 +66,15 @@ public class RegisterFileTests
             Assert.That(sut[Register8.Z], Is.EqualTo(0xBB));
             Assert.That(sut[Register8.IR], Is.EqualTo(0xCC));
             Assert.That(sut[Register8.IME], Is.EqualTo(0x01));
+            Assert.That(sut[Register8.SPH], Is.EqualTo(0x20));
+            Assert.That(sut[Register8.SPL], Is.EqualTo(0x30));
 
             Assert.That(sut[Register16.AF], Is.EqualTo(0x1234));
             Assert.That(sut[Register16.BC], Is.EqualTo(0x5678));
             Assert.That(sut[Register16.DE], Is.EqualTo(0x9ABC));
             Assert.That(sut[Register16.HL], Is.EqualTo(0xDEF0));
             Assert.That(sut[Register16.WZ], Is.EqualTo(0xAABB));
+            Assert.That(sut[Register16.SP], Is.EqualTo(0x2030));
         });
     }
 
@@ -105,6 +112,8 @@ public class RegisterFileTests
             Assert.That(sut[Register8.Z], Is.EqualTo(0xAA));
             Assert.That(sut[Register8.IR], Is.Zero);
             Assert.That(sut[Register8.IME], Is.Zero);
+            Assert.That(sut[Register8.SPH], Is.EqualTo(0xDD));
+            Assert.That(sut[Register8.SPL], Is.EqualTo(0xEE));
         });
     }
 

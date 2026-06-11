@@ -307,6 +307,76 @@ public class CpuTests
         });
     }
 
+    [Test]
+    public void LoadImmediate16([ValueSource(nameof(StdRegister16))] Register16 dst)
+    {
+        var opcode = (byte)(0b00_00_0001 | ((EncodeStdRegister16(dst) << 4)));
+        var sut = new Cpu(
+            new RegisterFile(),
+            new Ram([opcode, 0xFE, 0xCA, 0])
+        );
+
+        var cycles = sut.Step();
+
+        Assert.Multiple(() => {
+            Assert.That(sut.Registers[dst], Is.EqualTo(0xCAFE));
+            Assert.That(cycles, Is.EqualTo(3));
+        });
+    }
+
+    [Test]
+    public void LoadIndirectImmediateSP()
+    {
+        byte opcode = 0b00_001000;
+        var sut = new Cpu(
+            new RegisterFile { [Register16.SP] = 0xCAFE },
+            new Ram([opcode, 0x04, 0x00, 0, 0xFF, 0xFF])
+        );
+
+        var cycles = sut.Step();
+
+        Assert.Multiple(() => {
+            Assert.That(sut.Memory.Read(0x0004), Is.EqualTo(0xFE));
+            Assert.That(sut.Memory.Read(0x0005), Is.EqualTo(0xCA));
+            Assert.That(cycles, Is.EqualTo(5));
+        });
+    }
+
+    [Test]
+    public void LoadSPHL()
+    {
+        byte opcode = 0b11_111001;
+        var sut = new Cpu(
+            new RegisterFile { [Register16.HL] = 0x4267 },
+            new Rom([opcode, 0])
+        );
+
+        var cycles = sut.Step();
+
+        Assert.Multiple(() => {
+            Assert.That(sut.Registers[Register16.SP], Is.EqualTo(0x4267));
+            Assert.That(cycles, Is.EqualTo(2));
+        });
+    }
+
+    [Test]
+    public void LoadHLAdjustedSP([Values(0x42, -0x42)] sbyte offset)
+    {
+        byte opcode = 0b11_111000;
+        var sut = new Cpu(
+            new RegisterFile { [Register16.SP] = 0xFF00 },
+            new Rom([opcode, (byte)offset, 0])
+        );
+
+        var cycles = sut.Step();
+
+        Assert.Multiple(() => {
+            Assert.That(sut.Registers[Register16.HL], Is.EqualTo((ushort)(0xFF00 + offset)));
+            Assert.That(sut.Registers[Register8.F], Is.EqualTo(0b0000_0000));
+            Assert.That(cycles, Is.EqualTo(3));
+        });
+    }
+
     public static Register8[] StdRegister8 => [
         Register8.A,
         Register8.B,
@@ -327,6 +397,23 @@ public class CpuTests
             Register8.E => 0b011,
             Register8.H => 0b100,
             Register8.L => 0b101,
+            _ => throw new ArgumentOutOfRangeException(nameof(reg)),
+        };
+
+    public static Register16[] StdRegister16 => [
+        Register16.BC,
+        Register16.DE,
+        Register16.HL,
+        Register16.SP,
+    ];
+
+    [SuppressMessage("ReSharper", "SwitchExpressionHandlesSomeKnownEnumValuesWithExceptionInDefault")]
+    private static byte EncodeStdRegister16(Register16 reg) =>
+        reg switch {
+            Register16.BC => 0b00,
+            Register16.DE => 0b01,
+            Register16.HL => 0b10,
+            Register16.SP => 0b11,
             _ => throw new ArgumentOutOfRangeException(nameof(reg)),
         };
 }
