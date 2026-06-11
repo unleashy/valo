@@ -123,10 +123,10 @@ public class RegisterFileTests
         var sut = new RegisterFile();
 
         Assert.Multiple(() => {
-            Assert.That(sut.GetFlag(FlagsBit.Z), Is.False);
-            Assert.That(sut.GetFlag(FlagsBit.N), Is.False);
-            Assert.That(sut.GetFlag(FlagsBit.H), Is.False);
-            Assert.That(sut.GetFlag(FlagsBit.C), Is.False);
+            Assert.That(sut.Flags.IsSet(FlagsBit.Z), Is.False);
+            Assert.That(sut.Flags.IsSet(FlagsBit.N), Is.False);
+            Assert.That(sut.Flags.IsSet(FlagsBit.H), Is.False);
+            Assert.That(sut.Flags.IsSet(FlagsBit.C), Is.False);
         });
     }
 
@@ -135,18 +135,18 @@ public class RegisterFileTests
     {
         var sut = new RegisterFile();
 
-        sut.SetFlag(FlagsBit.Z, true);
-        sut.SetFlag(FlagsBit.N, true);
-        sut.SetFlag(FlagsBit.H, true);
-        sut.SetFlag(FlagsBit.C, true);
+        sut.Flags.Set(FlagsBit.Z, true);
+        sut.Flags.Set(FlagsBit.N, true);
+        sut.Flags.Set(FlagsBit.H, true);
+        sut.Flags.Set(FlagsBit.C, true);
 
         Assert.Multiple(() => {
-            Assert.That(sut.GetFlag(FlagsBit.Z), Is.True);
-            Assert.That(sut.GetFlag(FlagsBit.N), Is.True);
-            Assert.That(sut.GetFlag(FlagsBit.H), Is.True);
-            Assert.That(sut.GetFlag(FlagsBit.C), Is.True);
+            Assert.That(sut.Flags.IsSet(FlagsBit.Z), Is.True);
+            Assert.That(sut.Flags.IsSet(FlagsBit.N), Is.True);
+            Assert.That(sut.Flags.IsSet(FlagsBit.H), Is.True);
+            Assert.That(sut.Flags.IsSet(FlagsBit.C), Is.True);
 
-            Assert.That(sut[Register8.F], Is.EqualTo(0b1111_0000));
+            Assert.That(sut.F, Is.EqualTo(0b1111_0000));
         });
     }
 
@@ -155,18 +155,18 @@ public class RegisterFileTests
     {
         var sut = new RegisterFile();
 
-        sut.SetFlag(FlagsBit.Z, false);
-        sut.SetFlag(FlagsBit.N, true);
-        sut.SetFlag(FlagsBit.H, false);
-        sut.SetFlag(FlagsBit.C, true);
+        sut.Flags.Set(FlagsBit.Z, false);
+        sut.Flags.Set(FlagsBit.N, true);
+        sut.Flags.Set(FlagsBit.H, false);
+        sut.Flags.Set(FlagsBit.C, true);
 
         Assert.Multiple(() => {
-            Assert.That(sut.GetFlag(FlagsBit.Z), Is.False);
-            Assert.That(sut.GetFlag(FlagsBit.N), Is.True);
-            Assert.That(sut.GetFlag(FlagsBit.H), Is.False);
-            Assert.That(sut.GetFlag(FlagsBit.C), Is.True);
+            Assert.That(sut.Flags.IsSet(FlagsBit.Z), Is.False);
+            Assert.That(sut.Flags.IsSet(FlagsBit.N), Is.True);
+            Assert.That(sut.Flags.IsSet(FlagsBit.H), Is.False);
+            Assert.That(sut.Flags.IsSet(FlagsBit.C), Is.True);
 
-            Assert.That(sut[Register8.F], Is.EqualTo(0b0101_0000));
+            Assert.That(sut.F, Is.EqualTo(0b0101_0000));
         });
     }
 }

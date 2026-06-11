@@ -30,12 +30,13 @@ public enum Register16
     SP = 14,
 }
 
+[Flags]
 public enum FlagsBit
 {
-    Z,
-    N,
-    H,
-    C,
+    Z = 0b1000_0000,
+    N = 0b0100_0000,
+    H = 0b0010_0000,
+    C = 0b0001_0000,
 }
 
 public struct RegisterFile
@@ -71,25 +72,64 @@ public struct RegisterFile
         }
     }
 
-    public readonly bool GetFlag(FlagsBit bit)
-    {
-        var flags = this[Register8.F];
+    public byte A { readonly get => this[Register8.A]; set => this[Register8.A] = value; }
+    public byte F { readonly get => this[Register8.F]; set => this[Register8.F] = value; }
+    public ushort AF { readonly get => this[Register16.AF]; set => this[Register16.AF] = value; }
 
-        return ((flags >> (7 - (int)bit)) & 1) != 0;
+    public byte B { readonly get => this[Register8.B]; set => this[Register8.B] = value; }
+    public byte C { readonly get => this[Register8.C]; set => this[Register8.C] = value; }
+    public ushort BC { readonly get => this[Register16.BC]; set => this[Register16.BC] = value; }
+
+    public byte D { readonly get => this[Register8.D]; set => this[Register8.D] = value; }
+    public byte E { readonly get => this[Register8.E]; set => this[Register8.E] = value; }
+    public ushort DE { readonly get => this[Register16.DE]; set => this[Register16.DE] = value; }
+
+    public byte H { readonly get => this[Register8.H]; set => this[Register8.H] = value; }
+    public byte L { readonly get => this[Register8.L]; set => this[Register8.L] = value; }
+    public ushort HL { readonly get => this[Register16.HL]; set => this[Register16.HL] = value; }
+
+    public byte W { readonly get => this[Register8.W]; set => this[Register8.W] = value; }
+    public byte Z { readonly get => this[Register8.Z]; set => this[Register8.Z] = value; }
+    public ushort WZ { readonly get => this[Register16.WZ]; set => this[Register16.WZ] = value; }
+
+    public byte IR { readonly get => this[Register8.IR]; set => this[Register8.IR] = value; }
+    public byte IME { readonly get => this[Register8.IME]; set => this[Register8.IME] = value; }
+
+    public ushort PC { readonly get => this[Register16.PC]; set => this[Register16.PC] = value; }
+
+    public byte SPH { readonly get => this[Register8.SPH]; set => this[Register8.SPH] = value; }
+    public byte SPL { readonly get => this[Register8.SPL]; set => this[Register8.SPL] = value; }
+    public ushort SP { readonly get => this[Register16.SP]; set => this[Register16.SP] = value; }
+}
+
+public static class RegisterFileExtensions
+{
+    extension (ref RegisterFile self)
+    {
+        public FlagsRegister Flags => new(ref self);
+    }
+}
+
+public readonly ref struct FlagsRegister
+{
+    private readonly ref RegisterFile _reg;
+
+    public FlagsRegister(ref RegisterFile reg)
+    {
+        _reg = ref reg;
     }
 
-    public void SetFlag(FlagsBit bit, bool value)
-    {
-        var flags = this[Register8.F];
-        var mask = 1 << (7 - (int)bit);
+    public FlagsBit Value => (FlagsBit)_reg.F;
 
+    public bool IsSet(FlagsBit bit) => (_reg.F & (byte)bit) != 0;
+
+    public void Set(FlagsBit bits, bool value)
+    {
         if (value) {
-            flags = (byte)(flags | mask);
+            _reg.F |= (byte)bits;
         }
         else {
-            flags = (byte)(flags & ~mask);
+            _reg.F &= (byte)~bits;
         }
-
-        this[Register8.F] = flags;
     }
 }

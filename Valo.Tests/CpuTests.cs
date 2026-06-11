@@ -41,7 +41,7 @@ public class CpuTests
     {
         var opcode = (byte)(0b01_000_110 | (EncodeStdRegister8(dst) << 3));
         var sut = new Cpu(
-            new RegisterFile { [Register16.HL] = 0x0002 },
+            new RegisterFile { HL = 0x0002 },
             new Rom([opcode, 0, 0x42])
         );
 
@@ -58,7 +58,7 @@ public class CpuTests
     {
         var opcode = (byte)(0b01_110_000 | EncodeStdRegister8(src));
         var sut = new Cpu(
-            new RegisterFile { [src] = 0x42, [Register16.HL] = 0x0002 },
+            new RegisterFile { [src] = 0x42, HL = 0x0002 },
             new Ram([opcode, 0, 0xFF])
         );
 
@@ -75,7 +75,7 @@ public class CpuTests
     {
         byte opcode = 0b00_110_110;
         var sut = new Cpu(
-            new RegisterFile { [Register16.HL] = 0x0003 },
+            new RegisterFile { HL = 0x0003 },
             new Ram([opcode, 0x42, 0, 0xFF])
         );
 
@@ -99,7 +99,7 @@ public class CpuTests
         var cycles = sut.Step();
 
         Assert.Multiple(() => {
-            Assert.That(sut.Registers[Register8.A], Is.EqualTo(0x42));
+            Assert.That(sut.Registers.A, Is.EqualTo(0x42));
             Assert.That(cycles, Is.EqualTo(2));
         });
     }
@@ -109,7 +109,7 @@ public class CpuTests
     {
         var opcode = (byte)(dst == Register16.BC ? 0b00_00_0010 : 0b00_01_0010);
         var sut = new Cpu(
-            new RegisterFile { [Register8.A] = 0x42, [dst] = 0x0002 },
+            new RegisterFile { A = 0x42, [dst] = 0x0002 },
             new Ram([opcode, 0, 0xFF])
         );
 
@@ -133,7 +133,7 @@ public class CpuTests
         var cycles = sut.Step();
 
         Assert.Multiple(() => {
-            Assert.That(sut.Registers[Register8.A], Is.EqualTo(0x42));
+            Assert.That(sut.Registers.A, Is.EqualTo(0x42));
             Assert.That(cycles, Is.EqualTo(4));
         });
     }
@@ -143,7 +143,7 @@ public class CpuTests
     {
         byte opcode = 0b11_101010;
         var sut = new Cpu(
-            new RegisterFile { [Register8.A] = 0x42 },
+            new RegisterFile { A = 0x42 },
             new Ram([opcode, 0x04, 0x00, 0, 0xFF])
         );
 
@@ -160,7 +160,7 @@ public class CpuTests
     {
         byte opcode = 0b11_110010;
         var sut = new Cpu(
-            new RegisterFile { [Register8.C] = 0xF1 },
+            new RegisterFile { C = 0xF1 },
             new MappedMemory.Builder()
                 .Map(0x0000, 0x0002, new Rom([opcode, 0]))
                 .Map(0xFFF1, 0xFFF2, new Rom([0x42]))
@@ -170,7 +170,7 @@ public class CpuTests
         var cycles = sut.Step();
 
         Assert.Multiple(() => {
-            Assert.That(sut.Registers[Register8.A], Is.EqualTo(0x42));
+            Assert.That(sut.Registers.A, Is.EqualTo(0x42));
             Assert.That(cycles, Is.EqualTo(2));
         });
     }
@@ -180,7 +180,7 @@ public class CpuTests
     {
         byte opcode = 0b11_100010;
         var sut = new Cpu(
-            new RegisterFile { [Register8.C] = 0xF1, [Register8.A] = 0x42 },
+            new RegisterFile { C = 0xF1, A = 0x42 },
             new MappedMemory.Builder()
                 .Map(0x0000, new Rom([opcode, 0]))
                 .Map(0xFFF1, new Ram([0xFF]))
@@ -210,7 +210,7 @@ public class CpuTests
         var cycles = sut.Step();
 
         Assert.Multiple(() => {
-            Assert.That(sut.Registers[Register8.A], Is.EqualTo(0x42));
+            Assert.That(sut.Registers.A, Is.EqualTo(0x42));
             Assert.That(cycles, Is.EqualTo(3));
         });
     }
@@ -220,7 +220,7 @@ public class CpuTests
     {
         byte opcode = 0b11_100000;
         var sut = new Cpu(
-            new RegisterFile { [Register8.A] = 0x42 },
+            new RegisterFile { A = 0x42 },
             new MappedMemory.Builder()
                 .Map(0x0000, new Rom([opcode, 0xF1, 0]))
                 .Map(0xFFF1, new Ram([0xFF]))
@@ -240,15 +240,15 @@ public class CpuTests
     {
         byte opcode = 0b00_10_1010;
         var sut = new Cpu(
-            new RegisterFile { [Register16.HL] = 0x0002 },
+            new RegisterFile { HL = 0x0002 },
             new Rom([opcode, 0, 0x42])
         );
 
         var cycles = sut.Step();
 
         Assert.Multiple(() => {
-            Assert.That(sut.Registers[Register8.A], Is.EqualTo(0x42));
-            Assert.That(sut.Registers[Register16.HL], Is.EqualTo(0x0003));
+            Assert.That(sut.Registers.A, Is.EqualTo(0x42));
+            Assert.That(sut.Registers.HL, Is.EqualTo(0x0003));
             Assert.That(cycles, Is.EqualTo(2));
         });
     }
@@ -258,15 +258,15 @@ public class CpuTests
     {
         byte opcode = 0b00_11_1010;
         var sut = new Cpu(
-            new RegisterFile { [Register16.HL] = 0x0002 },
+            new RegisterFile { HL = 0x0002 },
             new Rom([opcode, 0, 0x42])
         );
 
         var cycles = sut.Step();
 
         Assert.Multiple(() => {
-            Assert.That(sut.Registers[Register8.A], Is.EqualTo(0x42));
-            Assert.That(sut.Registers[Register16.HL], Is.EqualTo(0x0001));
+            Assert.That(sut.Registers.A, Is.EqualTo(0x42));
+            Assert.That(sut.Registers.HL, Is.EqualTo(0x0001));
             Assert.That(cycles, Is.EqualTo(2));
         });
     }
@@ -276,7 +276,7 @@ public class CpuTests
     {
         byte opcode = 0b00_10_0010;
         var sut = new Cpu(
-            new RegisterFile { [Register8.A] = 0x42, [Register16.HL] = 0x0002 },
+            new RegisterFile { A = 0x42, HL = 0x0002 },
             new Ram([opcode, 0, 0x42])
         );
 
@@ -284,7 +284,7 @@ public class CpuTests
 
         Assert.Multiple(() => {
             Assert.That(sut.Memory.Read(0x0002), Is.EqualTo(0x42));
-            Assert.That(sut.Registers[Register16.HL], Is.EqualTo(0x0003));
+            Assert.That(sut.Registers.HL, Is.EqualTo(0x0003));
             Assert.That(cycles, Is.EqualTo(2));
         });
     }
@@ -294,7 +294,7 @@ public class CpuTests
     {
         byte opcode = 0b00_11_0010;
         var sut = new Cpu(
-            new RegisterFile { [Register8.A] = 0x42, [Register16.HL] = 0x0002 },
+            new RegisterFile { A = 0x42, HL = 0x0002 },
             new Ram([opcode, 0, 0xFF])
         );
 
@@ -302,7 +302,7 @@ public class CpuTests
 
         Assert.Multiple(() => {
             Assert.That(sut.Memory.Read(0x0002), Is.EqualTo(0x42));
-            Assert.That(sut.Registers[Register16.HL], Is.EqualTo(0x0001));
+            Assert.That(sut.Registers.HL, Is.EqualTo(0x0001));
             Assert.That(cycles, Is.EqualTo(2));
         });
     }
@@ -310,7 +310,7 @@ public class CpuTests
     [Test]
     public void LoadImmediate16([ValueSource(nameof(StdRegister16))] Register16 dst)
     {
-        var opcode = (byte)(0b00_00_0001 | ((EncodeStdRegister16(dst) << 4)));
+        var opcode = (byte)(0b00_00_0001 | (EncodeStdRegister16(dst) << 4));
         var sut = new Cpu(
             new RegisterFile(),
             new Ram([opcode, 0xFE, 0xCA, 0])
@@ -329,7 +329,7 @@ public class CpuTests
     {
         byte opcode = 0b00_001000;
         var sut = new Cpu(
-            new RegisterFile { [Register16.SP] = 0xCAFE },
+            new RegisterFile { SP = 0xCAFE },
             new Ram([opcode, 0x04, 0x00, 0, 0xFF, 0xFF])
         );
 
@@ -347,32 +347,36 @@ public class CpuTests
     {
         byte opcode = 0b11_111001;
         var sut = new Cpu(
-            new RegisterFile { [Register16.HL] = 0x4267 },
+            new RegisterFile { HL = 0x4267 },
             new Rom([opcode, 0])
         );
 
         var cycles = sut.Step();
 
         Assert.Multiple(() => {
-            Assert.That(sut.Registers[Register16.SP], Is.EqualTo(0x4267));
+            Assert.That(sut.Registers.SP, Is.EqualTo(0x4267));
             Assert.That(cycles, Is.EqualTo(2));
         });
     }
 
-    [Test]
-    public void LoadHLAdjustedSP([Values(0x42, -0x42)] sbyte offset)
+    [TestCase(0xFF00, +0x42, 0)]
+    [TestCase(0xFF00, -0x42, 0)]
+    [TestCase(0xFFC0, +0x40, FlagsBit.C)]
+    [TestCase(0x0008, +0x08, FlagsBit.H)]
+    [TestCase(0x00FF, -0x7F, FlagsBit.C | FlagsBit.H)]
+    public void LoadHLAdjustedSP(int sp, sbyte offset, FlagsBit flags)
     {
         byte opcode = 0b11_111000;
         var sut = new Cpu(
-            new RegisterFile { [Register16.SP] = 0xFF00 },
+            new RegisterFile { SP = (ushort)sp },
             new Rom([opcode, (byte)offset, 0])
         );
 
         var cycles = sut.Step();
 
         Assert.Multiple(() => {
-            Assert.That(sut.Registers[Register16.HL], Is.EqualTo((ushort)(0xFF00 + offset)));
-            Assert.That(sut.Registers[Register8.F], Is.EqualTo(0b0000_0000));
+            Assert.That(sut.Registers.HL, Is.EqualTo((ushort)(sp + offset)));
+            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(flags));
             Assert.That(cycles, Is.EqualTo(3));
         });
     }
