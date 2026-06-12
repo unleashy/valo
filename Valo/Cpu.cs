@@ -208,10 +208,12 @@ public sealed class Cpu
                     _reg.W = _mem.Read(_reg.PC++);
                     yield return false;
 
-                    _mem.Write(_reg.WZ++, _reg.SPL);
+                    var (sph, spl) = _reg.Split(Register16.SP);
+
+                    _mem.Write(_reg.WZ++, spl);
                     yield return false;
 
-                    _mem.Write(_reg.WZ, _reg.SPH);
+                    _mem.Write(_reg.WZ, sph);
                     yield return false;
                     break;
                 }
@@ -220,14 +222,16 @@ public sealed class Cpu
                     _reg.Z = _mem.Read(_reg.PC++);
                     yield return false;
 
-                    _reg.L = Add(_reg.SPL, _reg.Z, out var carry, out var halfCarry);
+                    var (sph, spl) = _reg.Split(Register16.SP);
+
+                    _reg.L = Add(spl, _reg.Z, out var carry, out var halfCarry);
                     _reg.Flags.Set(FlagsBit.Z | FlagsBit.N, false);
                     _reg.Flags.Set(FlagsBit.H, halfCarry);
                     _reg.Flags.Set(FlagsBit.C, carry);
                     yield return false;
 
                     var adj = _reg.Z > sbyte.MaxValue ? byte.MaxValue : 0;
-                    _reg.H = (byte)(_reg.SPH + adj + (carry ? 1 : 0));
+                    _reg.H = (byte)(sph + adj + (carry ? 1 : 0));
 
                     break;
                 }
@@ -236,6 +240,32 @@ public sealed class Cpu
                     _reg.SP = _reg.HL;
                     yield return false;
 
+                    break;
+                }
+
+                case Op.Push: {
+                    _reg.SP--;
+                    yield return false;
+
+                    var (msb, lsb) = _reg.Split((Register16)instr.Src);
+
+                    _mem.Write(_reg.SP--, msb);
+                    yield return false;
+
+                    _mem.Write(_reg.SP, lsb);
+                    yield return false;
+
+                    break;
+                }
+
+                case Op.Pop: {
+                    _reg.Z = _mem.Read(_reg.SP++);
+                    yield return false;
+
+                    _reg.W = _mem.Read(_reg.SP++);
+                    yield return false;
+
+                    _reg[(Register16)instr.Dst] = _reg.WZ;
                     break;
                 }
 
@@ -285,6 +315,8 @@ file enum Op
     LoadInd16SP,
     LoadHLAdjustedSP,
     LoadSPHL,
+    Push,
+    Pop,
 }
 
 file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Src = byte.MaxValue)
@@ -401,6 +433,28 @@ file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Sr
 
             case 0b11: {
                 switch (opcode & 0b111111) {
+                    case 0b000001:
+                    case 0b010001:
+                    case 0b100001:
+                    case 0b110001: {
+                        // Pop from stack to register16
+                        // 7 6   5 4   3 2 1 0
+                        // 1 1  [src]  0 1 0 1
+                        var dst = (byte)((opcode >> 4) & 0b11);
+                        return new Instruction(Op.Pop, Dst: ToReg16Stack(dst));
+                    }
+
+                    case 0b000101:
+                    case 0b010101:
+                    case 0b100101:
+                    case 0b110101: {
+                        // Push register16 to stack
+                        // 7 6   5 4   3 2 1 0
+                        // 1 1  [src]  0 1 0 1
+                        var src = (byte)((opcode >> 4) & 0b11);
+                        return new Instruction(Op.Push, Src: ToReg16Stack(src));
+                    }
+
                     case 0b101010: {
                         // Load direct immediate16 from A
                         // 7 6  5 4 3 2 1 0
@@ -486,6 +540,15 @@ file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Sr
                 1 => (byte)Register16.DE,
                 2 => (byte)Register16.HL,
                 3 => (byte)Register16.SP,
+                _ => throw new ArgumentException($"Not a Register16 placeholder: {placeholder}"),
+            };
+
+        static byte ToReg16Stack(byte placeholder) =>
+            placeholder switch {
+                0 => (byte)Register16.BC,
+                1 => (byte)Register16.DE,
+                2 => (byte)Register16.HL,
+                3 => (byte)Register16.AF,
                 _ => throw new ArgumentException($"Not a Register16 placeholder: {placeholder}"),
             };
     }

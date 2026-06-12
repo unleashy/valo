@@ -381,6 +381,43 @@ public class CpuTests
         });
     }
 
+    [Test]
+    public void Push([ValueSource(nameof(StackRegister16))] Register16 src)
+    {
+        var opcode = (byte)(0b11_00_0101 | (EncodeStackRegister16(src) << 4));
+        var sut = new Cpu(
+            new RegisterFile { SP = 0x0004, [src] = 0xCAFE },
+            new Ram([opcode, 0, 0, 0])
+        );
+
+        var cycles = sut.Step();
+
+        Assert.Multiple(() => {
+            Assert.That(sut.Registers.SP, Is.EqualTo(0x0002));
+            Assert.That(sut.Memory.Read(0x0002), Is.EqualTo(0xFE));
+            Assert.That(sut.Memory.Read(0x0003), Is.EqualTo(0xCA));
+            Assert.That(cycles, Is.EqualTo(4));
+        });
+    }
+
+    [Test]
+    public void Pop([ValueSource(nameof(StackRegister16))] Register16 dst)
+    {
+        var opcode = (byte)(0b11_00_0001 | (EncodeStackRegister16(dst) << 4));
+        var sut = new Cpu(
+            new RegisterFile { SP = 0x0002 },
+            new Rom([opcode, 0, 0xFE, 0xCA])
+        );
+
+        var cycles = sut.Step();
+
+        Assert.Multiple(() => {
+            Assert.That(sut.Registers.SP, Is.EqualTo(0x0004));
+            Assert.That(sut.Registers[dst], Is.EqualTo(0xCAFE));
+            Assert.That(cycles, Is.EqualTo(3));
+        });
+    }
+
     public static Register8[] StdRegister8 => [
         Register8.A,
         Register8.B,
@@ -419,5 +456,22 @@ public class CpuTests
             Register16.HL => 0b10,
             Register16.SP => 0b11,
             _ => throw new ArgumentOutOfRangeException(nameof(reg)),
+        };
+
+    public static Register16[] StackRegister16 => [
+        Register16.BC,
+        Register16.DE,
+        Register16.HL,
+        Register16.AF,
+    ];
+
+    [SuppressMessage("ReSharper", "SwitchExpressionHandlesSomeKnownEnumValuesWithExceptionInDefault")]
+    private static byte EncodeStackRegister16(Register16 reg) =>
+        reg switch {
+            Register16.BC => 0b00,
+            Register16.DE => 0b01,
+            Register16.HL => 0b10,
+            Register16.AF => 0b11,
+            _             => throw new ArgumentOutOfRangeException(nameof(reg)),
         };
 }

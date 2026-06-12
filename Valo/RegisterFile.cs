@@ -97,9 +97,20 @@ public struct RegisterFile
 
     public ushort PC { readonly get => this[Register16.PC]; set => this[Register16.PC] = value; }
 
-    public byte SPH { readonly get => this[Register8.SPH]; set => this[Register8.SPH] = value; }
-    public byte SPL { readonly get => this[Register8.SPL]; set => this[Register8.SPL] = value; }
     public ushort SP { readonly get => this[Register16.SP]; set => this[Register16.SP] = value; }
+
+    public readonly (byte Msb, byte Lsb) Split(Register16 register) =>
+        #pragma warning disable CS8524 // The switch expression does not handle some values of its input type (it is not exhaustive) involving an unnamed enum value.
+        register switch {
+            Register16.AF => (A, F),
+            Register16.BC => (B, C),
+            Register16.DE => (D, E),
+            Register16.HL => (H, L),
+            Register16.WZ => (W, Z),
+            Register16.PC => (_storage[(int)Register16.PC + 1], _storage[(int)Register16.PC]),
+            Register16.SP => (_storage[(int)Register16.SP + 1], _storage[(int)Register16.SP]),
+        };
+        #pragma warning restore CS8524 // The switch expression does not handle some values of its input type (it is not exhaustive) involving an unnamed enum value.
 }
 
 public static class RegisterFileExtensions
