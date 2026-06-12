@@ -5,13 +5,15 @@ namespace Valo;
 public sealed class Cpu
 {
     private RegisterFile _reg;
-    private readonly IMemory _mem;
     private readonly IEnumerator<bool> _executor;
 
-    public Cpu(RegisterFile reg, IMemory mem)
+    public ref RegisterFile Registers => ref _reg;
+    public IMemory Memory { get; }
+
+    public Cpu(RegisterFile registers, IMemory memory)
     {
-        _reg = reg;
-        _mem = mem;
+        _reg = registers;
+        Memory = memory;
         _executor = Executor();
     }
 
@@ -28,16 +30,13 @@ public sealed class Cpu
         return _executor.Current;
     }
 
-    public ref RegisterFile Registers => ref _reg;
-    public IMemory Memory => _mem;
-
     private IEnumerator<bool> Executor()
     {
         // Technically, the first instruction executed by the CPU is a NOP (that falls through to
         // a generic fetch) but this would be annoying to work around in when using Step() right
         // after building a new CPU instance so this (irrelevant) behaviour is not emulated.
         // Therefore, this memory read is not considered a cycle per se and does not `yield`.
-        _reg.IR = _mem.Read(_reg.PC++);
+        _reg.IR = Memory.Read(_reg.PC++);
 
         while (true) {
             var instr = Instruction.Decode(_reg.IR);
@@ -51,7 +50,7 @@ public sealed class Cpu
                 }
 
                 case Op.LoadImm8: {
-                    _reg.Z = _mem.Read(_reg.PC++);
+                    _reg.Z = Memory.Read(_reg.PC++);
                     yield return false;
 
                     _reg[(Register8)instr.Dst] = _reg.Z;
@@ -59,7 +58,7 @@ public sealed class Cpu
                 }
 
                 case Op.LoadReg8IndHL: {
-                    _reg.Z = _mem.Read(_reg.HL);
+                    _reg.Z = Memory.Read(_reg.HL);
                     yield return false;
 
                     _reg[(Register8)instr.Dst] = _reg.Z;
@@ -67,24 +66,24 @@ public sealed class Cpu
                 }
 
                 case Op.LoadIndHLReg8: {
-                    _mem.Write(_reg.HL, _reg[(Register8)instr.Src]);
+                    Memory.Write(_reg.HL, _reg[(Register8)instr.Src]);
                     yield return false;
 
                     break;
                 }
 
                 case Op.LoadIndHLImm8: {
-                    _reg.Z = _mem.Read(_reg.PC++);
+                    _reg.Z = Memory.Read(_reg.PC++);
                     yield return false;
 
-                    _mem.Write(_reg.HL, _reg.Z);
+                    Memory.Write(_reg.HL, _reg.Z);
                     yield return false;
 
                     break;
                 }
 
                 case Op.LoadAInd16: {
-                    _reg.Z = _mem.Read(_reg[(Register16)instr.Src]);
+                    _reg.Z = Memory.Read(_reg[(Register16)instr.Src]);
                     yield return false;
 
                     _reg.A = _reg.Z;
@@ -92,33 +91,33 @@ public sealed class Cpu
                 }
 
                 case Op.LoadInd16A: {
-                    _mem.Write(_reg[(Register16)instr.Dst], _reg.A);
+                    Memory.Write(_reg[(Register16)instr.Dst], _reg.A);
                     yield return false;
 
                     break;
                 }
 
                 case Op.LoadDir16A: {
-                    _reg.Z = _mem.Read(_reg.PC++);
+                    _reg.Z = Memory.Read(_reg.PC++);
                     yield return false;
 
-                    _reg.W = _mem.Read(_reg.PC++);
+                    _reg.W = Memory.Read(_reg.PC++);
                     yield return false;
 
-                    _mem.Write(_reg.WZ, _reg.A);
+                    Memory.Write(_reg.WZ, _reg.A);
                     yield return false;
 
                     break;
                 }
 
                 case Op.LoadADir16: {
-                    _reg.Z = _mem.Read(_reg.PC++);
+                    _reg.Z = Memory.Read(_reg.PC++);
                     yield return false;
 
-                    _reg.W = _mem.Read(_reg.PC++);
+                    _reg.W = Memory.Read(_reg.PC++);
                     yield return false;
 
-                    _reg.Z = _mem.Read(_reg.WZ);
+                    _reg.Z = Memory.Read(_reg.WZ);
                     yield return false;
 
                     _reg.A = _reg.Z;
@@ -126,7 +125,7 @@ public sealed class Cpu
                 }
 
                 case Op.LoadAIndHigh: {
-                    _reg.Z = _mem.Read((ushort)(0xFF00 | _reg.C));
+                    _reg.Z = Memory.Read((ushort)(0xFF00 | _reg.C));
                     yield return false;
 
                     _reg.A = _reg.Z;
@@ -134,17 +133,17 @@ public sealed class Cpu
                 }
 
                 case Op.LoadIndHighA: {
-                    _mem.Write((ushort)(0xFF00 | _reg.C), _reg.A);
+                    Memory.Write((ushort)(0xFF00 | _reg.C), _reg.A);
                     yield return false;
 
                     break;
                 }
 
                 case Op.LoadADirHigh: {
-                    _reg.Z = _mem.Read(_reg.PC++);
+                    _reg.Z = Memory.Read(_reg.PC++);
                     yield return false;
 
-                    _reg.Z = _mem.Read((ushort)(0xFF00 | _reg.Z));
+                    _reg.Z = Memory.Read((ushort)(0xFF00 | _reg.Z));
                     yield return false;
 
                     _reg.A = _reg.Z;
@@ -152,16 +151,16 @@ public sealed class Cpu
                 }
 
                 case Op.LoadDirHighA: {
-                    _reg.Z = _mem.Read(_reg.PC++);
+                    _reg.Z = Memory.Read(_reg.PC++);
                     yield return false;
 
-                    _mem.Write((ushort)(0xFF00 | _reg.Z), _reg.A);
+                    Memory.Write((ushort)(0xFF00 | _reg.Z), _reg.A);
                     yield return false;
                     break;
                 }
 
                 case Op.LoadAIncHL: {
-                    _reg.Z = _mem.Read(_reg.HL++);
+                    _reg.Z = Memory.Read(_reg.HL++);
                     yield return false;
 
                     _reg.A = _reg.Z;
@@ -169,7 +168,7 @@ public sealed class Cpu
                 }
 
                 case Op.LoadADecHL: {
-                    _reg.Z = _mem.Read(_reg.HL--);
+                    _reg.Z = Memory.Read(_reg.HL--);
                     yield return false;
 
                     _reg.A = _reg.Z;
@@ -177,24 +176,24 @@ public sealed class Cpu
                 }
 
                 case Op.LoadIncHLA: {
-                    _mem.Write(_reg.HL++, _reg.A);
+                    Memory.Write(_reg.HL++, _reg.A);
                     yield return false;
 
                     break;
                 }
 
                 case Op.LoadDecHLA: {
-                    _mem.Write(_reg.HL--, _reg.A);
+                    Memory.Write(_reg.HL--, _reg.A);
                     yield return false;
 
                     break;
                 }
 
                 case Op.LoadImm16: {
-                    _reg.Z = _mem.Read(_reg.PC++);
+                    _reg.Z = Memory.Read(_reg.PC++);
                     yield return false;
 
-                    _reg.W = _mem.Read(_reg.PC++);
+                    _reg.W = Memory.Read(_reg.PC++);
                     yield return false;
 
                     _reg[(Register16)instr.Dst] = _reg.WZ;
@@ -202,24 +201,24 @@ public sealed class Cpu
                 }
 
                 case Op.LoadInd16SP: {
-                    _reg.Z = _mem.Read(_reg.PC++);
+                    _reg.Z = Memory.Read(_reg.PC++);
                     yield return false;
 
-                    _reg.W = _mem.Read(_reg.PC++);
+                    _reg.W = Memory.Read(_reg.PC++);
                     yield return false;
 
                     var (sph, spl) = _reg.Split(Register16.SP);
 
-                    _mem.Write(_reg.WZ++, spl);
+                    Memory.Write(_reg.WZ++, spl);
                     yield return false;
 
-                    _mem.Write(_reg.WZ, sph);
+                    Memory.Write(_reg.WZ, sph);
                     yield return false;
                     break;
                 }
 
                 case Op.LoadHLAdjustedSP: {
-                    _reg.Z = _mem.Read(_reg.PC++);
+                    _reg.Z = Memory.Read(_reg.PC++);
                     yield return false;
 
                     var (sph, spl) = _reg.Split(Register16.SP);
@@ -249,20 +248,20 @@ public sealed class Cpu
 
                     var (msb, lsb) = _reg.Split((Register16)instr.Src);
 
-                    _mem.Write(_reg.SP--, msb);
+                    Memory.Write(_reg.SP--, msb);
                     yield return false;
 
-                    _mem.Write(_reg.SP, lsb);
+                    Memory.Write(_reg.SP, lsb);
                     yield return false;
 
                     break;
                 }
 
                 case Op.Pop: {
-                    _reg.Z = _mem.Read(_reg.SP++);
+                    _reg.Z = Memory.Read(_reg.SP++);
                     yield return false;
 
-                    _reg.W = _mem.Read(_reg.SP++);
+                    _reg.W = Memory.Read(_reg.SP++);
                     yield return false;
 
                     _reg[(Register16)instr.Dst] = _reg.WZ;
@@ -276,7 +275,7 @@ public sealed class Cpu
                 }
             }
 
-            _reg.IR = _mem.Read(_reg.PC++);
+            _reg.IR = Memory.Read(_reg.PC++);
             yield return true;
         }
     }
