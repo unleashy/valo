@@ -270,7 +270,7 @@ public sealed class Cpu
                 }
 
                 default: {
-                    throw new NotImplementedException(
+                    throw new UnreachableException(
                         $"Missing implementation for operation {instr.Op}"
                     );
                 }
@@ -520,7 +520,7 @@ file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Sr
             default: break;
         }
 
-        throw new NotImplementedException($"Missing decoder for opcode 0x{opcode:X2}");
+        throw new UnreachableException($"Missing decoder for opcode 0x{opcode:X2}");
 
         static byte ToReg8(byte placeholder) =>
             placeholder switch {
