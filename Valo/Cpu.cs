@@ -419,6 +419,28 @@ public sealed class Cpu
                     break;
                 }
 
+                case Op.Ccf: {
+                    _reg.Flags.Apply(
+                        FlagsBit.N | FlagsBit.H | FlagsBit.C,
+                        _reg.Flags.IsSet(FlagsBit.C) ? 0 : FlagsBit.C
+                    );
+                    break;
+                }
+
+                case Op.Scf: {
+                    _reg.Flags.Apply(
+                        FlagsBit.N | FlagsBit.H | FlagsBit.C,
+                        FlagsBit.C
+                    );
+                    break;
+                }
+
+                case Op.Cpl: {
+                    _reg.A = (byte)~_reg.A;
+                    _reg.Flags.Set(FlagsBit.N | FlagsBit.H);
+                    break;
+                }
+
                 default: {
                     throw new UnreachableException(
                         $"Missing implementation for operation {instr.Op}"
@@ -510,6 +532,10 @@ file enum Op
     IncHL,
     DecReg8,
     DecHL,
+    Ccf,
+    Scf,
+    Cpl,
+    Daa,
 }
 
 file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Src = byte.MaxValue)
@@ -628,6 +654,50 @@ file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Sr
                             // 0 0  [dst]  1 1 0
                             return new Instruction(Op.LoadImm8, ToReg8(dst));
                         }
+                    }
+
+                    case 0b0111: {
+                        var specifier = opcode >> 4;
+
+                        switch (specifier) {
+                            case 0b10: {
+                                // Decimal adjust accumulator
+                                // 7 6  5 4  3 2 1 0
+                                // 0 0  1 0  0 1 1 1
+                                return new Instruction(Op.Daa);
+                            }
+
+                            case 0b11: {
+                                // Set carry flag
+                                // 7 6  5 4  3 2 1 0
+                                // 0 0  1 1  0 1 1 1
+                                return new Instruction(Op.Scf);
+                            }
+                        }
+
+                        break;
+                    }
+
+                    case 0b1111: {
+                        var specifier = opcode >> 4;
+
+                        switch (specifier) {
+                            case 0b10: {
+                                // Complement accumulator
+                                // 7 6  5 4  3 2 1 0
+                                // 0 0  1 0  1 1 1 1
+                                return new Instruction(Op.Cpl);
+                            }
+
+                            case 0b11: {
+                                // Complement carry flag
+                                // 7 6  5 4  3 2 1 0
+                                // 0 0  1 1  1 1 1 1
+                                return new Instruction(Op.Ccf);
+                            }
+                        }
+
+                        break;
                     }
 
                     default: break;

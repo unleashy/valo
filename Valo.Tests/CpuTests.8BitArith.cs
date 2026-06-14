@@ -538,4 +538,61 @@ public partial class CpuTests
         });
     }
     #endregion DEC instruction
+
+    [TestCase(FlagsBit.N | FlagsBit.H, FlagsBit.C)]
+    [TestCase(FlagsBit.C | FlagsBit.N | FlagsBit.H, 0)]
+    [TestCase(FlagsBit.Z | FlagsBit.C | FlagsBit.N | FlagsBit.H, FlagsBit.Z)]
+    [TestCase(FlagsBit.Z | FlagsBit.N | FlagsBit.H, FlagsBit.Z | FlagsBit.C)]
+    public void Ccf(FlagsBit before, FlagsBit after)
+    {
+        byte opcode = 0b00_111_111;
+        var sut = new Cpu(
+            new RegisterFile { F = (byte)before },
+            new Rom([opcode, 0])
+        );
+
+        var cycles = sut.Step();
+
+        Assert.Multiple(() => {
+            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(after));
+            Assert.That(cycles, Is.EqualTo(1));
+        });
+    }
+
+    [TestCase(FlagsBit.N | FlagsBit.H, FlagsBit.C)]
+    [TestCase(FlagsBit.C | FlagsBit.N | FlagsBit.H, FlagsBit.C)]
+    [TestCase(FlagsBit.Z, FlagsBit.Z | FlagsBit.C)]
+    public void Scf(FlagsBit before, FlagsBit after)
+    {
+        byte opcode = 0b00_110_111;
+        var sut = new Cpu(
+            new RegisterFile { F = (byte)before },
+            new Rom([opcode, 0])
+        );
+
+        var cycles = sut.Step();
+
+        Assert.Multiple(() => {
+            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(after));
+            Assert.That(cycles, Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void Cpl()
+    {
+        byte opcode = 0b00_101_111;
+        var sut = new Cpu(
+            new RegisterFile { A = 0xFF },
+            new Rom([opcode, 0])
+        );
+
+        var cycles = sut.Step();
+
+        Assert.Multiple(() => {
+            Assert.That(sut.Registers.A, Is.EqualTo(0));
+            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(FlagsBit.N | FlagsBit.H));
+            Assert.That(cycles, Is.EqualTo(1));
+        });
+    }
 }
