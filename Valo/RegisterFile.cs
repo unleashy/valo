@@ -134,14 +134,9 @@ public readonly ref struct FlagsRegister
 
     public bool IsSet(FlagsBit bit) => (_reg.F & (byte)bit) != 0;
 
-    public void Set(FlagsBit bits, bool value)
+    public void Apply(FlagsBit affected, FlagsBit bits)
     {
-        if (value) {
-            _reg.F |= (byte)bits;
-        }
-        else {
-            _reg.F &= (byte)~bits;
-        }
+        _reg.F = (byte)(((FlagsBit)_reg.F & ~affected) | (bits & affected));
     }
 
     public void Replace(FlagsBit bits)

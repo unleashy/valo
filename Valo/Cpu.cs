@@ -224,8 +224,7 @@ public sealed class Cpu
                     var (sph, spl) = _reg.Split(Register16.SP);
 
                     _reg.L = Add(spl, _reg.Z, out var flags);
-                    _reg.Flags.Set(flags, true);
-                    _reg.Flags.Set(FlagsBit.Z | FlagsBit.N, false);
+                    _reg.Flags.Replace(flags);
                     yield return false;
 
                     var adj = _reg.Z > sbyte.MaxValue ? byte.MaxValue : 0;
@@ -382,6 +381,44 @@ public sealed class Cpu
                     break;
                 }
 
+                case Op.IncReg8: {
+                    _reg[(Register8)instr.Dst] = Add(_reg[(Register8)instr.Dst], 1, out var flags);
+                    _reg.Flags.Apply(FlagsBit.Z | FlagsBit.N | FlagsBit.H, flags);
+
+                    break;
+                }
+
+                case Op.IncHL: {
+                    _reg.Z = Memory.Read(_reg.HL);
+                    yield return false;
+
+                    var result = Add(_reg.Z, 1, out var flags);
+                    _reg.Flags.Apply(FlagsBit.Z | FlagsBit.N | FlagsBit.H, flags);
+
+                    Memory.Write(_reg.HL, result);
+                    yield return false;
+                    break;
+                }
+
+                case Op.DecReg8: {
+                    _reg[(Register8)instr.Dst] = Sub(_reg[(Register8)instr.Dst], 1, out var flags);
+                    _reg.Flags.Apply(FlagsBit.Z | FlagsBit.N | FlagsBit.H, flags);
+
+                    break;
+                }
+
+                case Op.DecHL: {
+                    _reg.Z = Memory.Read(_reg.HL);
+                    yield return false;
+
+                    var result = Sub(_reg.Z, 1, out var flags);
+                    _reg.Flags.Apply(FlagsBit.Z | FlagsBit.N | FlagsBit.H, flags);
+
+                    Memory.Write(_reg.HL, result);
+                    yield return false;
+                    break;
+                }
+
                 default: {
                     throw new UnreachableException(
                         $"Missing implementation for operation {instr.Op}"
@@ -469,6 +506,10 @@ file enum Op
     CpReg8,
     CpHL,
     CpImm8,
+    IncReg8,
+    IncHL,
+    DecReg8,
+    DecHL,
 }
 
 file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Src = byte.MaxValue)
@@ -533,6 +574,42 @@ file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Sr
                             0b11 => new Instruction(Op.LoadADecHL),
                             _    => throw new UnreachableException(),
                         };
+                    }
+
+                    case 0b0100:
+                    case 0b1100: {
+                        var dst = (byte)((opcode >> 3) & 0b111);
+
+                        if (dst == 0b110) {
+                            // Increment indirect HL
+                            // 7 6  5 4 3  2 1 0
+                            // 0 0  1 1 0  1 0 0
+                            return new Instruction(Op.IncHL);
+                        }
+                        else {
+                            // Increment register8
+                            // 7 6  5 4 3  2 1 0
+                            // 0 0  [dst]  1 0 0
+                            return new Instruction(Op.IncReg8, ToReg8(dst));
+                        }
+                    }
+
+                    case 0b0101:
+                    case 0b1101: {
+                        var dst = (byte)((opcode >> 3) & 0b111);
+
+                        if (dst == 0b110) {
+                            // Decrement indirect HL
+                            // 7 6  5 4 3  2 1 0
+                            // 0 0  1 1 0  1 0 1
+                            return new Instruction(Op.DecHL);
+                        }
+                        else {
+                            // Decrement register8
+                            // 7 6  5 4 3  2 1 0
+                            // 0 0  [dst]  1 0 1
+                            return new Instruction(Op.DecReg8, ToReg8(dst));
+                        }
                     }
 
                     case 0b0110:

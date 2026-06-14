@@ -56,8 +56,9 @@ public partial class CpuTests
 
     [TestCase(0xFF00, +0x42, 0)]
     [TestCase(0xFF00, -0x42, 0)]
-    [TestCase(0xFFC0, +0x40, FlagsBit.C)]
+    [TestCase(0xFFC0, +0x42, FlagsBit.C)]
     [TestCase(0x0008, +0x08, FlagsBit.H)]
+    [TestCase(0xFFC0, +0x40, FlagsBit.C | FlagsBit.Z)]
     [TestCase(0x00FF, -0x7F, FlagsBit.C | FlagsBit.H)]
     public void LoadHLAdjustedSP(int sp, sbyte offset, FlagsBit flags)
     {

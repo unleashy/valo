@@ -425,4 +425,117 @@ public partial class CpuTests
         });
     }
     #endregion CP instruction
+
+    #region INC instruction
+    [Test]
+    public void Inc([ValueSource(nameof(StdRegister8))] Register8 src)
+    {
+        var opcode = (byte)(0b00_000_100 | (EncodeStdRegister8(src) << 3));
+        var sut = new Cpu(
+            new RegisterFile { [src] = 0x42 },
+            new Rom([opcode, 0])
+        );
+
+        var cycles = sut.Step();
+
+        Assert.Multiple(() => {
+            Assert.That(sut.Registers[src], Is.EqualTo(0x43));
+            Assert.That(cycles, Is.EqualTo(1));
+        });
+    }
+
+    [TestCase(0, 0)]
+    [TestCase(0x0F, FlagsBit.H)]
+    [TestCase(0xFF, FlagsBit.Z | FlagsBit.H)]
+    public void IncFlags(byte value, FlagsBit flags)
+    {
+        byte opcode = 0b00_000_100;
+        var sut = new Cpu(
+            new RegisterFile { B = value, F = (byte)FlagsBit.N },
+            new Rom([opcode, 0])
+        );
+
+        var cycles = sut.Step();
+
+        Assert.Multiple(() => {
+            Assert.That(sut.Registers.B, Is.EqualTo((byte)(value + 1)));
+            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(flags));
+            Assert.That(cycles, Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void IncHL()
+    {
+        byte opcode = 0b00_110_100;
+        var sut = new Cpu(
+            new RegisterFile { HL = 0x0002 },
+            new Ram([opcode, 0, 0x42])
+        );
+
+        var cycles = sut.Step();
+
+        Assert.Multiple(() => {
+            Assert.That(sut.Memory.Read(0x0002), Is.EqualTo(0x43));
+            Assert.That(cycles, Is.EqualTo(3));
+        });
+    }
+    #endregion
+
+    #region DEC instruction
+    [Test]
+    public void Dec([ValueSource(nameof(StdRegister8))] Register8 src)
+    {
+        var opcode = (byte)(0b00_000_101 | (EncodeStdRegister8(src) << 3));
+        var sut = new Cpu(
+            new RegisterFile { [src] = 0x42 },
+            new Rom([opcode, 0])
+        );
+
+        var cycles = sut.Step();
+
+        Assert.Multiple(() => {
+            Assert.That(sut.Registers[src], Is.EqualTo(0x41));
+            Assert.That(cycles, Is.EqualTo(1));
+        });
+    }
+
+    [TestCase(0x02, FlagsBit.N)]
+    [TestCase(0x01, FlagsBit.Z | FlagsBit.N)]
+    [TestCase(0x10, FlagsBit.H | FlagsBit.N)]
+    [TestCase(0x00, FlagsBit.H | FlagsBit.N)]
+    public void DecFlags(byte value, FlagsBit flags)
+    {
+        byte opcode = 0b00_000_101;
+        var sut = new Cpu(
+            new RegisterFile { B = value },
+            new Rom([opcode, 0])
+        );
+
+        var cycles = sut.Step();
+
+        Assert.Multiple(() => {
+            Assert.That(sut.Registers.B, Is.EqualTo((byte)(value - 1)));
+            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(flags));
+            Assert.That(cycles, Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void DecHL()
+    {
+        byte opcode = 0b00_110_101;
+        var sut = new Cpu(
+            new RegisterFile { HL = 0x0002 },
+            new Ram([opcode, 0, 0x42])
+        );
+
+        var cycles = sut.Step();
+
+        Assert.Multiple(() => {
+            Assert.That(sut.Memory.Read(0x0002), Is.EqualTo(0x41));
+            Assert.That(cycles, Is.EqualTo(3));
+        });
+    }
+    #endregion DEC instruction
 }
