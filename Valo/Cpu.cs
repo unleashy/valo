@@ -362,6 +362,26 @@ public sealed class Cpu
                     break;
                 }
 
+                case Op.CpHL: {
+                    _reg[(Register8)instr.Src] = Memory.Read(_reg.HL);
+                    yield return false;
+
+                    goto case Op.CpReg8;
+                }
+
+                case Op.CpImm8: {
+                    _reg[(Register8)instr.Src] = Memory.Read(_reg.PC++);
+                    yield return false;
+
+                    goto case Op.CpReg8;
+                }
+
+                case Op.CpReg8: {
+                    _ = Sub(_reg.A, _reg[(Register8)instr.Src], out var flags);
+                    _reg.Flags.Replace(flags);
+                    break;
+                }
+
                 default: {
                     throw new UnreachableException(
                         $"Missing implementation for operation {instr.Op}"
@@ -446,6 +466,9 @@ file enum Op
     SbcReg8,
     SbcHL,
     SbcImm8,
+    CpReg8,
+    CpHL,
+    CpImm8,
 }
 
 file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Src = byte.MaxValue)
@@ -612,6 +635,18 @@ file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Sr
                             return new Instruction(Op.SbcReg8, Src: ToReg8(operand));
                         }
                     }
+
+                    case 0b111: {
+                        // Compare register8
+                        // 7 6  5 4 3  2 1 0
+                        // 1 0  1 1 1  [src]
+                        if (operand == 0b110) {
+                            return new Instruction(Op.CpHL, Src: (byte)Register8.Z);
+                        }
+                        else {
+                            return new Instruction(Op.CpReg8, Src: ToReg8(operand));
+                        }
+                    }
                 }
 
                 break;
@@ -645,6 +680,13 @@ file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Sr
                         // 7 6  5 4 3 2 1 0
                         // 1 1  0 1 1 1 1 0
                         return new Instruction(Op.SbcImm8, Src: (byte)Register8.Z);
+                    }
+
+                    case 0b111110: {
+                        // Compare immediate8
+                        // 7 6  5 4 3 2 1 0
+                        // 1 1  1 1 1 1 1 0
+                        return new Instruction(Op.CpImm8, Src: (byte)Register8.Z);
                     }
 
                     case 0b000001:

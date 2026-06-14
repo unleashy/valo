@@ -194,11 +194,15 @@ public partial class CpuTests
         });
     }
 
-    [TestCase(0x02, 0x01, FlagsBit.N)]
-    [TestCase(0x00, 0x00, FlagsBit.Z | FlagsBit.N)]
-    [TestCase(0x10, 0x01, FlagsBit.H | FlagsBit.N)]
-    [TestCase(0x10, 0x20, FlagsBit.C | FlagsBit.N)]
-    [TestCase(0x10, 0x12, FlagsBit.H | FlagsBit.C | FlagsBit.N)]
+    public static object[][] SubFlagsTestCases => [
+        [(byte)0x02, (byte)0x01, FlagsBit.N],
+        [(byte)0x10, (byte)0x10, FlagsBit.Z | FlagsBit.N],
+        [(byte)0x10, (byte)0x01, FlagsBit.H | FlagsBit.N],
+        [(byte)0x10, (byte)0x20, FlagsBit.C | FlagsBit.N],
+        [(byte)0x10, (byte)0x12, FlagsBit.H | FlagsBit.C | FlagsBit.N],
+    ];
+
+    [TestCaseSource(nameof(SubFlagsTestCases))]
     public void SubFlags(byte a, byte b, FlagsBit flags)
     {
         byte opcode = 0b10_010_000;
@@ -341,4 +345,84 @@ public partial class CpuTests
         });
     }
     #endregion SBC instruction
+
+    #region CP instruction
+    [Test]
+    public void Cp([ValueSource(nameof(StdRegister8))] Register8 src)
+    {
+        var opcode = (byte)(0b10_111_000 | EncodeStdRegister8(src));
+        var sut = new Cpu(
+            new RegisterFile { A = 0x10, [src] = 0x10 },
+            new Rom([opcode, 0])
+        );
+
+        var cycles = sut.Step();
+
+        Assert.Multiple(() => {
+            // No registers change!
+            Assert.That(sut.Registers.A, Is.EqualTo(0x10));
+            Assert.That(sut.Registers[src], Is.EqualTo(0x10));
+            // But the flags do
+            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(FlagsBit.Z | FlagsBit.N));
+            Assert.That(cycles, Is.EqualTo(1));
+        });
+    }
+
+    [TestCaseSource(nameof(SubFlagsTestCases))]
+    public void CpFlags(byte a, byte b, FlagsBit flags)
+    {
+        byte opcode = 0b10_111_000;
+        var sut = new Cpu(
+            new RegisterFile { A = a, B = b },
+            new Rom([opcode, 0])
+        );
+
+        var cycles = sut.Step();
+
+        Assert.Multiple(() => {
+            // No registers change!
+            Assert.That(sut.Registers.A, Is.EqualTo(a));
+            Assert.That(sut.Registers.B, Is.EqualTo(b));
+            // But the flags do
+            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(flags));
+            Assert.That(cycles, Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void CpHL()
+    {
+        byte opcode = 0b10_111_110;
+        var sut = new Cpu(
+            new RegisterFile { A = 0x42, HL = 0x0002 },
+            new Rom([opcode, 0, 0x25])
+        );
+
+        var cycles = sut.Step();
+
+        Assert.Multiple(() => {
+            Assert.That(sut.Registers.A, Is.EqualTo(0x42));
+            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(FlagsBit.H | FlagsBit.N));
+            Assert.That(cycles, Is.EqualTo(2));
+        });
+    }
+
+    [Test]
+    public void CpImmediate()
+    {
+        byte opcode = 0b11_111_110;
+        var sut = new Cpu(
+            new RegisterFile { A = 0x42 },
+            new Rom([opcode, 0x25, 0])
+        );
+
+        var cycles = sut.Step();
+
+        Assert.Multiple(() => {
+            Assert.That(sut.Registers.A, Is.EqualTo(0x42));
+            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(FlagsBit.H | FlagsBit.N));
+            Assert.That(cycles, Is.EqualTo(2));
+        });
+    }
+    #endregion CP instruction
 }
