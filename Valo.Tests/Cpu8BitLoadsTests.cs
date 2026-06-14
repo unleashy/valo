@@ -1,6 +1,6 @@
 ﻿namespace Valo.Tests;
 
-public partial class CpuTests
+public class Cpu8BitLoadsTests : CpuTestsBase
 {
     [Test]
     public void LoadRegisterRegister(

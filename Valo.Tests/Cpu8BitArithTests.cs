@@ -1,6 +1,6 @@
 ﻿namespace Valo.Tests;
 
-public partial class CpuTests
+public class Cpu8BitArithTests : CpuTestsBase
 {
     #region ADD instruction
     [Test]

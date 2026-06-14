@@ -2,7 +2,7 @@
 
 namespace Valo.Tests;
 
-public partial class CpuTests
+public abstract class CpuTestsBase
 {
     public static Register8[] StdRegister8 => [
         Register8.A,
@@ -15,7 +15,7 @@ public partial class CpuTests
     ];
 
     [SuppressMessage("ReSharper", "SwitchExpressionHandlesSomeKnownEnumValuesWithExceptionInDefault")]
-    private static byte EncodeStdRegister8(Register8 reg) =>
+    protected static byte EncodeStdRegister8(Register8 reg) =>
         reg switch {
             Register8.A => 0b111,
             Register8.B => 0b000,
@@ -35,7 +35,7 @@ public partial class CpuTests
     ];
 
     [SuppressMessage("ReSharper", "SwitchExpressionHandlesSomeKnownEnumValuesWithExceptionInDefault")]
-    private static byte EncodeStdRegister16(Register16 reg) =>
+    protected static byte EncodeStdRegister16(Register16 reg) =>
         reg switch {
             Register16.BC => 0b00,
             Register16.DE => 0b01,
@@ -52,7 +52,7 @@ public partial class CpuTests
     ];
 
     [SuppressMessage("ReSharper", "SwitchExpressionHandlesSomeKnownEnumValuesWithExceptionInDefault")]
-    private static byte EncodeStackRegister16(Register16 reg) =>
+    protected static byte EncodeStackRegister16(Register16 reg) =>
         reg switch {
             Register16.BC => 0b00,
             Register16.DE => 0b01,

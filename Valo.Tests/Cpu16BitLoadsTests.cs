@@ -1,6 +1,6 @@
 ﻿namespace Valo.Tests;
 
-public partial class CpuTests
+public class Cpu16BitLoadsTests : CpuTestsBase
 {
     [Test]
     public void LoadImmediate16([ValueSource(nameof(StdRegister16))] Register16 dst)
