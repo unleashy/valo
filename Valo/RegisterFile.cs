@@ -73,7 +73,7 @@ public struct RegisterFile
     }
 
     public byte A { readonly get => this[Register8.A]; set => this[Register8.A] = value; }
-    public byte F { readonly get => this[Register8.F]; set => this[Register8.F] = value; }
+    public FlagsBit F { readonly get => (FlagsBit)this[Register8.F]; set => this[Register8.F] = (byte)value; }
     public ushort AF { readonly get => this[Register16.AF]; set => this[Register16.AF] = value; }
 
     public byte B { readonly get => this[Register8.B]; set => this[Register8.B] = value; }
@@ -102,7 +102,7 @@ public struct RegisterFile
     public readonly (byte Msb, byte Lsb) Split(Register16 register) =>
         #pragma warning disable CS8524 // The switch expression does not handle some values of its input type (it is not exhaustive) involving an unnamed enum value.
         register switch {
-            Register16.AF => (A, F),
+            Register16.AF => (A, (byte)F),
             Register16.BC => (B, C),
             Register16.DE => (D, E),
             Register16.HL => (H, L),
@@ -130,23 +130,21 @@ public readonly ref struct FlagsRegister
         _reg = ref reg;
     }
 
-    public FlagsBit Value => (FlagsBit)_reg.F;
-
-    public bool IsSet(FlagsBit bit) => (_reg.F & (byte)bit) != 0;
+    public bool IsSet(FlagsBit bit) => (_reg.F & bit) != 0;
 
     public void Set(FlagsBit bits)
     {
-        _reg.F |= (byte)bits;
+        _reg.F |= bits;
     }
 
     public void Apply(FlagsBit affected, FlagsBit bits)
     {
-        _reg.F = (byte)(((FlagsBit)_reg.F & ~affected) | (bits & affected));
+        _reg.F = (_reg.F & ~affected) | (bits & affected);
     }
 
     public void Replace(FlagsBit bits)
     {
-        _reg.F = (byte)bits;
+        _reg.F = bits;
     }
 
     public (bool Z, bool N, bool H, bool C) Split() =>

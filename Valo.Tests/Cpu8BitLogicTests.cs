@@ -19,10 +19,7 @@ public class Cpu8BitLogicTests : CpuTestsBase
 
         Assert.Multiple(() => {
             Assert.That(sut.Registers.A, Is.EqualTo(sut.Registers.A & operand));
-            Assert.That(
-                sut.Registers.Flags.Value,
-                Is.EqualTo(FlagsBit.H | (operand == 0 ? FlagsBit.Z : 0))
-            );
+            Assert.That(sut.Registers.F, Is.EqualTo(FlagsBit.H | (operand == 0 ? FlagsBit.Z : 0)));
             Assert.That(cycles, Is.EqualTo(1));
         });
     }
@@ -40,10 +37,7 @@ public class Cpu8BitLogicTests : CpuTestsBase
 
         Assert.Multiple(() => {
             Assert.That(sut.Registers.A, Is.EqualTo(sut.Registers.A & operand));
-            Assert.That(
-                sut.Registers.Flags.Value,
-                Is.EqualTo(FlagsBit.H | (operand == 0 ? FlagsBit.Z : 0))
-            );
+            Assert.That(sut.Registers.F, Is.EqualTo(FlagsBit.H | (operand == 0 ? FlagsBit.Z : 0)));
             Assert.That(cycles, Is.EqualTo(2));
         });
     }
@@ -61,10 +55,7 @@ public class Cpu8BitLogicTests : CpuTestsBase
 
         Assert.Multiple(() => {
             Assert.That(sut.Registers.A, Is.EqualTo(sut.Registers.A & operand));
-            Assert.That(
-                sut.Registers.Flags.Value,
-                Is.EqualTo(FlagsBit.H | (operand == 0 ? FlagsBit.Z : 0))
-            );
+            Assert.That(sut.Registers.F, Is.EqualTo(FlagsBit.H | (operand == 0 ? FlagsBit.Z : 0)));
             Assert.That(cycles, Is.EqualTo(2));
         });
     }
@@ -87,7 +78,7 @@ public class Cpu8BitLogicTests : CpuTestsBase
 
         Assert.Multiple(() => {
             Assert.That(sut.Registers.A, Is.EqualTo(sut.Registers.A | operand));
-            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(operand == 0 ? FlagsBit.Z : 0));
+            Assert.That(sut.Registers.F, Is.EqualTo(operand == 0 ? FlagsBit.Z : 0));
             Assert.That(cycles, Is.EqualTo(1));
         });
     }
@@ -105,7 +96,7 @@ public class Cpu8BitLogicTests : CpuTestsBase
 
         Assert.Multiple(() => {
             Assert.That(sut.Registers.A, Is.EqualTo(sut.Registers.A | operand));
-            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(operand == 0 ? FlagsBit.Z : 0));
+            Assert.That(sut.Registers.F, Is.EqualTo(operand == 0 ? FlagsBit.Z : 0));
             Assert.That(cycles, Is.EqualTo(2));
         });
     }
@@ -123,7 +114,7 @@ public class Cpu8BitLogicTests : CpuTestsBase
 
         Assert.Multiple(() => {
             Assert.That(sut.Registers.A, Is.EqualTo(sut.Registers.A | operand));
-            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(operand == 0 ? FlagsBit.Z : 0));
+            Assert.That(sut.Registers.F, Is.EqualTo(operand == 0 ? FlagsBit.Z : 0));
             Assert.That(cycles, Is.EqualTo(2));
         });
     }
@@ -147,7 +138,7 @@ public class Cpu8BitLogicTests : CpuTestsBase
 
         Assert.Multiple(() => {
             Assert.That(sut.Registers.A, Is.EqualTo(a ^ operand));
-            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(a == operand ? FlagsBit.Z : 0));
+            Assert.That(sut.Registers.F, Is.EqualTo(a == operand ? FlagsBit.Z : 0));
             Assert.That(cycles, Is.EqualTo(1));
         });
     }
@@ -166,7 +157,7 @@ public class Cpu8BitLogicTests : CpuTestsBase
 
         Assert.Multiple(() => {
             Assert.That(sut.Registers.A, Is.EqualTo(a ^ operand));
-            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(a == operand ? FlagsBit.Z : 0));
+            Assert.That(sut.Registers.F, Is.EqualTo(a == operand ? FlagsBit.Z : 0));
             Assert.That(cycles, Is.EqualTo(2));
         });
     }
@@ -185,7 +176,7 @@ public class Cpu8BitLogicTests : CpuTestsBase
 
         Assert.Multiple(() => {
             Assert.That(sut.Registers.A, Is.EqualTo(a ^ operand));
-            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(a == operand ? FlagsBit.Z : 0));
+            Assert.That(sut.Registers.F, Is.EqualTo(a == operand ? FlagsBit.Z : 0));
             Assert.That(cycles, Is.EqualTo(2));
         });
     }

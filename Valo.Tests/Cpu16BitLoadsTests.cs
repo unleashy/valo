@@ -72,7 +72,7 @@ public class Cpu16BitLoadsTests : CpuTestsBase
 
         Assert.Multiple(() => {
             Assert.That(sut.Registers.HL, Is.EqualTo((ushort) (sp + offset)));
-            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(flags));
+            Assert.That(sut.Registers.F, Is.EqualTo(flags));
             Assert.That(cycles, Is.EqualTo(3));
         });
     }

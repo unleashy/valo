@@ -44,7 +44,7 @@ public class Cpu8BitArithTests : CpuTestsBase
 
         Assert.Multiple(() => {
             Assert.That(sut.Registers.A, Is.EqualTo((byte)(a + b)));
-            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(flags));
+            Assert.That(sut.Registers.F, Is.EqualTo(flags));
             Assert.That(cycles, Is.EqualTo(1));
         });
     }
@@ -97,7 +97,7 @@ public class Cpu8BitArithTests : CpuTestsBase
         var sut = new Cpu(
             new RegisterFile {
                 A = 0x42,
-                F = (byte)(carry == 1 ? FlagsBit.C : 0),
+                F = carry == 1 ? FlagsBit.C : 0,
                 [src] = operand,
             },
             new Rom([opcode, 0])
@@ -123,7 +123,7 @@ public class Cpu8BitArithTests : CpuTestsBase
     {
         byte opcode = 0b10_001_000;
         var sut = new Cpu(
-            new RegisterFile { A = a, B = b, F = (byte)(carry ? FlagsBit.C : 0) },
+            new RegisterFile { A = a, B = b, F = carry ? FlagsBit.C : 0 },
             new Rom([opcode, 0])
         );
 
@@ -131,7 +131,7 @@ public class Cpu8BitArithTests : CpuTestsBase
 
         Assert.Multiple(() => {
             Assert.That(sut.Registers.A, Is.EqualTo((byte)(a + b + (carry ? 1 : 0))));
-            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(flags));
+            Assert.That(sut.Registers.F, Is.EqualTo(flags));
             Assert.That(cycles, Is.EqualTo(1));
         });
     }
@@ -141,7 +141,7 @@ public class Cpu8BitArithTests : CpuTestsBase
     {
         byte opcode = 0b10_001_110;
         var sut = new Cpu(
-            new RegisterFile { A = 0x42, HL = 0x0002, F = (byte)(carry ? FlagsBit.C : 0) },
+            new RegisterFile { A = 0x42, HL = 0x0002, F = carry ? FlagsBit.C : 0 },
             new Rom([opcode, 0, 0x25])
         );
 
@@ -158,7 +158,7 @@ public class Cpu8BitArithTests : CpuTestsBase
     {
         byte opcode = 0b11_001_110;
         var sut = new Cpu(
-            new RegisterFile { A = 0x42, F = (byte)(carry ? FlagsBit.C : 0) },
+            new RegisterFile { A = 0x42, F = carry ? FlagsBit.C : 0 },
             new Rom([opcode, 0x25, 0])
         );
 
@@ -215,7 +215,7 @@ public class Cpu8BitArithTests : CpuTestsBase
 
         Assert.Multiple(() => {
             Assert.That(sut.Registers.A, Is.EqualTo((byte)(a - b)));
-            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(flags));
+            Assert.That(sut.Registers.F, Is.EqualTo(flags));
             Assert.That(cycles, Is.EqualTo(1));
         });
     }
@@ -268,7 +268,7 @@ public class Cpu8BitArithTests : CpuTestsBase
         var sut = new Cpu(
             new RegisterFile {
                 A = 0x42,
-                F = (byte)(carry == 1 ? FlagsBit.C : 0),
+                F = carry == 1 ? FlagsBit.C : 0,
                 [src] = operand,
             },
             new Rom([opcode, 0])
@@ -294,7 +294,7 @@ public class Cpu8BitArithTests : CpuTestsBase
     {
         byte opcode = 0b10_011_000;
         var sut = new Cpu(
-            new RegisterFile { A = a, B = b, F = (byte)(carry ? FlagsBit.C : 0) },
+            new RegisterFile { A = a, B = b, F = carry ? FlagsBit.C : 0 },
             new Rom([opcode, 0])
         );
 
@@ -302,7 +302,7 @@ public class Cpu8BitArithTests : CpuTestsBase
 
         Assert.Multiple(() => {
             Assert.That(sut.Registers.A, Is.EqualTo((byte)(a - b - (carry ? 1 : 0))));
-            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(flags));
+            Assert.That(sut.Registers.F, Is.EqualTo(flags));
             Assert.That(cycles, Is.EqualTo(1));
         });
     }
@@ -315,7 +315,7 @@ public class Cpu8BitArithTests : CpuTestsBase
             new RegisterFile {
                 A = 0x42,
                 HL = 0x0002,
-                F = (byte)(carry ? FlagsBit.C : 0),
+                F = carry ? FlagsBit.C : 0,
             },
             new Rom([opcode, 0, 0x25])
         );
@@ -333,7 +333,7 @@ public class Cpu8BitArithTests : CpuTestsBase
     {
         byte opcode = 0b11_011_110;
         var sut = new Cpu(
-            new RegisterFile { A = 0x42, F = (byte)(carry ? FlagsBit.C : 0) },
+            new RegisterFile { A = 0x42, F = carry ? FlagsBit.C : 0 },
             new Rom([opcode, 0x25, 0])
         );
 
@@ -363,7 +363,7 @@ public class Cpu8BitArithTests : CpuTestsBase
             Assert.That(sut.Registers.A, Is.EqualTo(0x10));
             Assert.That(sut.Registers[src], Is.EqualTo(0x10));
             // But the flags do
-            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(FlagsBit.Z | FlagsBit.N));
+            Assert.That(sut.Registers.F, Is.EqualTo(FlagsBit.Z | FlagsBit.N));
             Assert.That(cycles, Is.EqualTo(1));
         });
     }
@@ -384,7 +384,7 @@ public class Cpu8BitArithTests : CpuTestsBase
             Assert.That(sut.Registers.A, Is.EqualTo(a));
             Assert.That(sut.Registers.B, Is.EqualTo(b));
             // But the flags do
-            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(flags));
+            Assert.That(sut.Registers.F, Is.EqualTo(flags));
             Assert.That(cycles, Is.EqualTo(1));
         });
     }
@@ -402,7 +402,7 @@ public class Cpu8BitArithTests : CpuTestsBase
 
         Assert.Multiple(() => {
             Assert.That(sut.Registers.A, Is.EqualTo(0x42));
-            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(FlagsBit.H | FlagsBit.N));
+            Assert.That(sut.Registers.F, Is.EqualTo(FlagsBit.H | FlagsBit.N));
             Assert.That(cycles, Is.EqualTo(2));
         });
     }
@@ -420,7 +420,7 @@ public class Cpu8BitArithTests : CpuTestsBase
 
         Assert.Multiple(() => {
             Assert.That(sut.Registers.A, Is.EqualTo(0x42));
-            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(FlagsBit.H | FlagsBit.N));
+            Assert.That(sut.Registers.F, Is.EqualTo(FlagsBit.H | FlagsBit.N));
             Assert.That(cycles, Is.EqualTo(2));
         });
     }
@@ -451,7 +451,7 @@ public class Cpu8BitArithTests : CpuTestsBase
     {
         byte opcode = 0b00_000_100;
         var sut = new Cpu(
-            new RegisterFile { B = value, F = (byte)FlagsBit.N },
+            new RegisterFile { B = value, F = FlagsBit.N },
             new Rom([opcode, 0])
         );
 
@@ -459,7 +459,7 @@ public class Cpu8BitArithTests : CpuTestsBase
 
         Assert.Multiple(() => {
             Assert.That(sut.Registers.B, Is.EqualTo((byte)(value + 1)));
-            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(flags));
+            Assert.That(sut.Registers.F, Is.EqualTo(flags));
             Assert.That(cycles, Is.EqualTo(1));
         });
     }
@@ -516,7 +516,7 @@ public class Cpu8BitArithTests : CpuTestsBase
 
         Assert.Multiple(() => {
             Assert.That(sut.Registers.B, Is.EqualTo((byte)(value - 1)));
-            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(flags));
+            Assert.That(sut.Registers.F, Is.EqualTo(flags));
             Assert.That(cycles, Is.EqualTo(1));
         });
     }
@@ -548,14 +548,14 @@ public class Cpu8BitArithTests : CpuTestsBase
     {
         byte opcode = 0b00_111_111;
         var sut = new Cpu(
-            new RegisterFile { F = (byte)before },
+            new RegisterFile { F = before },
             new Rom([opcode, 0])
         );
 
         var cycles = sut.Step();
 
         Assert.Multiple(() => {
-            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(after));
+            Assert.That(sut.Registers.F, Is.EqualTo(after));
             Assert.That(cycles, Is.EqualTo(1));
         });
     }
@@ -569,14 +569,14 @@ public class Cpu8BitArithTests : CpuTestsBase
     {
         byte opcode = 0b00_110_111;
         var sut = new Cpu(
-            new RegisterFile { F = (byte)before },
+            new RegisterFile { F = before },
             new Rom([opcode, 0])
         );
 
         var cycles = sut.Step();
 
         Assert.Multiple(() => {
-            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(after));
+            Assert.That(sut.Registers.F, Is.EqualTo(after));
             Assert.That(cycles, Is.EqualTo(1));
         });
     }
@@ -596,7 +596,7 @@ public class Cpu8BitArithTests : CpuTestsBase
 
         Assert.Multiple(() => {
             Assert.That(sut.Registers.A, Is.EqualTo(0));
-            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(FlagsBit.N | FlagsBit.H));
+            Assert.That(sut.Registers.F, Is.EqualTo(FlagsBit.N | FlagsBit.H));
             Assert.That(cycles, Is.EqualTo(1));
         });
     }
@@ -619,7 +619,7 @@ public class Cpu8BitArithTests : CpuTestsBase
     {
         byte opcode = 0b00_100_111;
         var sut = new Cpu(
-            new RegisterFile { A = before, F = (byte)beforeFlags },
+            new RegisterFile { A = before, F = beforeFlags },
             new Rom([opcode, 0])
         );
 
@@ -627,7 +627,7 @@ public class Cpu8BitArithTests : CpuTestsBase
 
         Assert.Multiple(() => {
             Assert.That(sut.Registers.A, Is.EqualTo(after));
-            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(afterFlags));
+            Assert.That(sut.Registers.F, Is.EqualTo(afterFlags));
             Assert.That(cycles, Is.EqualTo(1));
         });
     }
