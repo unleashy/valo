@@ -464,6 +464,66 @@ public sealed class Cpu
                     break;
                 }
 
+                case Op.AndHL: {
+                    _reg[(Register8)instr.Src] = Memory.Read(_reg.HL);
+                    yield return false;
+
+                    goto case Op.AndReg8;
+                }
+
+                case Op.AndImm8: {
+                    _reg[(Register8)instr.Src] = Memory.Read(_reg.PC++);
+                    yield return false;
+
+                    goto case Op.AndReg8;
+                }
+
+                case Op.AndReg8: {
+                    _reg.A &= _reg[(Register8)instr.Src];
+                    _reg.Flags.Replace((_reg.A == 0 ? FlagsBit.Z : 0) | FlagsBit.H);
+                    break;
+                }
+
+                case Op.OrHL: {
+                    _reg[(Register8)instr.Src] = Memory.Read(_reg.HL);
+                    yield return false;
+
+                    goto case Op.OrReg8;
+                }
+
+                case Op.OrImm8: {
+                    _reg[(Register8)instr.Src] = Memory.Read(_reg.PC++);
+                    yield return false;
+
+                    goto case Op.OrReg8;
+                }
+
+                case Op.OrReg8: {
+                    _reg.A |= _reg[(Register8)instr.Src];
+                    _reg.Flags.Replace(_reg.A == 0 ? FlagsBit.Z : 0);
+                    break;
+                }
+
+                case Op.XorHL: {
+                    _reg[(Register8)instr.Src] = Memory.Read(_reg.HL);
+                    yield return false;
+
+                    goto case Op.XorReg8;
+                }
+
+                case Op.XorImm8: {
+                    _reg[(Register8)instr.Src] = Memory.Read(_reg.PC++);
+                    yield return false;
+
+                    goto case Op.XorReg8;
+                }
+
+                case Op.XorReg8: {
+                    _reg.A ^= _reg[(Register8)instr.Src];
+                    _reg.Flags.Replace(_reg.A == 0 ? FlagsBit.Z : 0);
+                    break;
+                }
+
                 default: {
                     throw new UnreachableException(
                         $"Missing implementation for operation {instr.Op}"
@@ -559,6 +619,16 @@ file enum Op
     Scf,
     Cpl,
     Daa,
+
+    AndReg8,
+    AndHL,
+    AndImm8,
+    OrReg8,
+    OrHL,
+    OrImm8,
+    XorReg8,
+    XorHL,
+    XorImm8,
 }
 
 file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Src = byte.MaxValue)
@@ -806,6 +876,42 @@ file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Sr
                         }
                     }
 
+                    case 0b100: {
+                        // Logical AND register8
+                        // 7 6  5 4 3  2 1 0
+                        // 1 0  1 0 0  [src]
+                        if (operand == 0b110) {
+                            return new Instruction(Op.AndHL, Src: (byte)Register8.Z);
+                        }
+                        else {
+                            return new Instruction(Op.AndReg8, Src: ToReg8(operand));
+                        }
+                    }
+
+                    case 0b101: {
+                        // Logical XOR register8
+                        // 7 6  5 4 3  2 1 0
+                        // 1 0  1 0 1  [src]
+                        if (operand == 0b110) {
+                            return new Instruction(Op.XorHL, Src: (byte)Register8.Z);
+                        }
+                        else {
+                            return new Instruction(Op.XorReg8, Src: ToReg8(operand));
+                        }
+                    }
+
+                    case 0b110: {
+                        // Logical OR register8
+                        // 7 6  5 4 3  2 1 0
+                        // 1 0  1 1 0  [src]
+                        if (operand == 0b110) {
+                            return new Instruction(Op.OrHL, Src: (byte)Register8.Z);
+                        }
+                        else {
+                            return new Instruction(Op.OrReg8, Src: ToReg8(operand));
+                        }
+                    }
+
                     case 0b111: {
                         // Compare register8
                         // 7 6  5 4 3  2 1 0
@@ -850,6 +956,27 @@ file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Sr
                         // 7 6  5 4 3 2 1 0
                         // 1 1  0 1 1 1 1 0
                         return new Instruction(Op.SbcImm8, Src: (byte)Register8.Z);
+                    }
+
+                    case 0b100110: {
+                        // Logical AND immediate8
+                        // 7 6  5 4 3 2 1 0
+                        // 1 1  1 0 0 1 1 0
+                        return new Instruction(Op.AndImm8, Src: (byte)Register8.Z);
+                    }
+
+                    case 0b110110: {
+                        // Logical OR immediate8
+                        // 7 6  5 4 3 2 1 0
+                        // 1 1  1 1 0 1 1 0
+                        return new Instruction(Op.OrImm8, Src: (byte)Register8.Z);
+                    }
+
+                    case 0b101110: {
+                        // Logical XOR immediate8
+                        // 7 6  5 4 3 2 1 0
+                        // 1 1  1 0 1 1 1 0
+                        return new Instruction(Op.XorImm8, Src: (byte)Register8.Z);
                     }
 
                     case 0b111110: {
