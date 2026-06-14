@@ -539,6 +539,7 @@ public partial class CpuTests
     }
     #endregion DEC instruction
 
+    #region CCF instruction
     [TestCase(FlagsBit.N | FlagsBit.H, FlagsBit.C)]
     [TestCase(FlagsBit.C | FlagsBit.N | FlagsBit.H, 0)]
     [TestCase(FlagsBit.Z | FlagsBit.C | FlagsBit.N | FlagsBit.H, FlagsBit.Z)]
@@ -558,7 +559,9 @@ public partial class CpuTests
             Assert.That(cycles, Is.EqualTo(1));
         });
     }
+    #endregion CCF instruction
 
+    #region SCF instruction
     [TestCase(FlagsBit.N | FlagsBit.H, FlagsBit.C)]
     [TestCase(FlagsBit.C | FlagsBit.N | FlagsBit.H, FlagsBit.C)]
     [TestCase(FlagsBit.Z, FlagsBit.Z | FlagsBit.C)]
@@ -577,7 +580,9 @@ public partial class CpuTests
             Assert.That(cycles, Is.EqualTo(1));
         });
     }
+    #endregion SCF instruction
 
+    #region CPL instructon
     [Test]
     public void Cpl()
     {
@@ -595,7 +600,9 @@ public partial class CpuTests
             Assert.That(cycles, Is.EqualTo(1));
         });
     }
+    #endregion CPL instruction
 
+    #region DAA instruction
     [TestCase(0x01, 0x01, 0,                                    0)]
     [TestCase(0x00, 0x00, 0,                                    FlagsBit.Z)]
     [TestCase(0x00, 0x60, FlagsBit.C,                           FlagsBit.C)]
@@ -624,4 +631,5 @@ public partial class CpuTests
             Assert.That(cycles, Is.EqualTo(1));
         });
     }
+    #endregion DAA instruction
 }
