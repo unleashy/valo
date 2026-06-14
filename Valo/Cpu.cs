@@ -441,6 +441,29 @@ public sealed class Cpu
                     break;
                 }
 
+                case Op.Daa: {
+                    var (_, negative, halfcarry, carry) = _reg.Flags.Split();
+
+                    // Adapted from https://www.reddit.com/r/EmuDev/comments/4ycoix/a_guide_to_the_gameboys_halfcarry_flag/d6p619w/
+                    var adjustment = 0;
+                    if (halfcarry || (!negative && (_reg.A & 0x0F) > 0x09)) {
+                        adjustment = 0x06;
+                    }
+
+                    if (carry || (!negative && _reg.A > 0x99)) {
+                        adjustment |= 0x60;
+                        carry = true;
+                    }
+
+                    _reg.A += (byte)(negative ? -adjustment : adjustment);
+                    _reg.Flags.Apply(
+                        FlagsBit.Z | FlagsBit.H | FlagsBit.C,
+                        (_reg.A == 0 ? FlagsBit.Z : 0) | (carry ? FlagsBit.C : 0)
+                    );
+
+                    break;
+                }
+
                 default: {
                     throw new UnreachableException(
                         $"Missing implementation for operation {instr.Op}"

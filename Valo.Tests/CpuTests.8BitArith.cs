@@ -595,4 +595,33 @@ public partial class CpuTests
             Assert.That(cycles, Is.EqualTo(1));
         });
     }
+
+    [TestCase(0x01, 0x01, 0,                                    0)]
+    [TestCase(0x00, 0x00, 0,                                    FlagsBit.Z)]
+    [TestCase(0x00, 0x60, FlagsBit.C,                           FlagsBit.C)]
+    [TestCase(0xA1, 0x01, 0,                                    FlagsBit.C)]
+    [TestCase(0x9A, 0x00, 0,                                    FlagsBit.Z | FlagsBit.C)]
+    [TestCase(0x02, 0x08, FlagsBit.H,                           0)]
+    [TestCase(0x01, 0x01, FlagsBit.N,                           FlagsBit.N)]
+    [TestCase(0x00, 0x00, FlagsBit.N,                           FlagsBit.Z | FlagsBit.N)]
+    [TestCase(0x90, 0x30, FlagsBit.N | FlagsBit.C,              FlagsBit.N | FlagsBit.C)]
+    [TestCase(0x90, 0x2A, FlagsBit.N | FlagsBit.H | FlagsBit.C, FlagsBit.N | FlagsBit.C)]
+    [TestCase(0x07, 0x01, FlagsBit.N | FlagsBit.H,              FlagsBit.N)]
+    [TestCase(0x06, 0x00, FlagsBit.N | FlagsBit.H,              FlagsBit.Z | FlagsBit.N)]
+    public void Daa(byte before, byte after, FlagsBit beforeFlags, FlagsBit afterFlags)
+    {
+        byte opcode = 0b00_100_111;
+        var sut = new Cpu(
+            new RegisterFile { A = before, F = (byte)beforeFlags },
+            new Rom([opcode, 0])
+        );
+
+        var cycles = sut.Step();
+
+        Assert.Multiple(() => {
+            Assert.That(sut.Registers.A, Is.EqualTo(after));
+            Assert.That(sut.Registers.Flags.Value, Is.EqualTo(afterFlags));
+            Assert.That(cycles, Is.EqualTo(1));
+        });
+    }
 }
