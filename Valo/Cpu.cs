@@ -223,14 +223,13 @@ public sealed class Cpu
 
                     var (sph, spl) = _reg.Split(Register16.SP);
 
-                    _reg.L = Add(spl, _reg.Z, out var carry, out var halfCarry);
+                    _reg.L = Add(spl, _reg.Z, out var flags);
+                    _reg.Flags.Set(flags, true);
                     _reg.Flags.Set(FlagsBit.Z | FlagsBit.N, false);
-                    _reg.Flags.Set(FlagsBit.H, halfCarry);
-                    _reg.Flags.Set(FlagsBit.C, carry);
                     yield return false;
 
                     var adj = _reg.Z > sbyte.MaxValue ? byte.MaxValue : 0;
-                    _reg.H = (byte)(sph + adj + (carry ? 1 : 0));
+                    _reg.H = (byte)(sph + adj + (flags.HasFlag(FlagsBit.C) ? 1 : 0));
 
                     break;
                 }
@@ -268,6 +267,101 @@ public sealed class Cpu
                     break;
                 }
 
+                case Op.AddHL: {
+                    _reg[(Register8)instr.Src] = Memory.Read(_reg.HL);
+                    yield return false;
+
+                    goto case Op.AddReg8;
+                }
+
+                case Op.AddImm8: {
+                    _reg[(Register8)instr.Src] = Memory.Read(_reg.PC++);
+                    yield return false;
+
+                    goto case Op.AddReg8;
+                }
+
+                case Op.AddReg8: {
+                    _reg.A = Add(_reg.A, _reg[(Register8)instr.Src], out var flags);
+                    _reg.Flags.Replace(flags);
+
+                    break;
+                }
+
+                case Op.AdcHL: {
+                    _reg[(Register8)instr.Src] = Memory.Read(_reg.HL);
+                    yield return false;
+
+                    goto case Op.AdcReg8;
+                }
+
+                case Op.AdcImm8: {
+                    _reg[(Register8)instr.Src] = Memory.Read(_reg.PC++);
+                    yield return false;
+
+                    goto case Op.AdcReg8;
+                }
+
+                case Op.AdcReg8: {
+                    _reg.A =
+                        Adc(
+                            _reg.A,
+                            _reg[(Register8)instr.Src],
+                            carry: _reg.Flags.IsSet(FlagsBit.C),
+                            out var flags
+                        );
+                    _reg.Flags.Replace(flags);
+
+                    break;
+                }
+
+                case Op.SubHL: {
+                    _reg[(Register8)instr.Src] = Memory.Read(_reg.HL);
+                    yield return false;
+
+                    goto case Op.SubReg8;
+                }
+
+                case Op.SubImm8: {
+                    _reg[(Register8)instr.Src] = Memory.Read(_reg.PC++);
+                    yield return false;
+
+                    goto case Op.SubReg8;
+                }
+
+                case Op.SubReg8: {
+                    _reg.A = Sub(_reg.A, _reg[(Register8)instr.Src], out var flags);
+                    _reg.Flags.Replace(flags);
+
+                    break;
+                }
+
+                case Op.SbcHL: {
+                    _reg[(Register8)instr.Src] = Memory.Read(_reg.HL);
+                    yield return false;
+
+                    goto case Op.SbcReg8;
+                }
+
+                case Op.SbcImm8: {
+                    _reg[(Register8)instr.Src] = Memory.Read(_reg.PC++);
+                    yield return false;
+
+                    goto case Op.SbcReg8;
+                }
+
+                case Op.SbcReg8: {
+                    _reg.A = Sbc(
+                        _reg.A,
+                        _reg[(Register8)instr.Src],
+                        carry: _reg.Flags.IsSet(FlagsBit.C),
+                        out var flags
+                    );
+                    _reg.Flags.Replace(flags);
+
+                    break;
+                }
+
                 default: {
                     throw new UnreachableException(
                         $"Missing implementation for operation {instr.Op}"
@@ -280,11 +374,34 @@ public sealed class Cpu
         }
     }
 
-    private static byte Add(byte a, byte b, out bool carry, out bool halfCarry)
+    private static byte Add(byte a, byte b, out FlagsBit flags) =>
+        Adc(a, b, carry: false, out flags);
+
+    private static byte Adc(byte a, byte b, bool carry, out FlagsBit flags)
     {
-        var result = a + b;
-        halfCarry = ((a ^ b ^ result) & 0x10) == 0x10;
-        carry = result > byte.MaxValue;
+        var c = carry ? 1 : 0;
+        var result = a + b + c;
+
+        flags = 0;
+        if ((byte)result == 0) flags |= FlagsBit.Z;
+        if (((a ^ b ^ c ^ result) & 0x10) == 0x10) flags |= FlagsBit.H;
+        if (result > byte.MaxValue) flags |= FlagsBit.C;
+
+        return (byte)result;
+    }
+
+    private static byte Sub(byte a, byte b, out FlagsBit flags) =>
+        Sbc(a, b, carry: false, out flags);
+
+    private static byte Sbc(byte a, byte b, bool carry, out FlagsBit flags)
+    {
+        var c = carry ? 1 : 0;
+        var result = a - b - c;
+
+        flags = FlagsBit.N;
+        if ((byte)result == 0) flags |= FlagsBit.Z;
+        if (((a ^ b ^ c ^ result) & 0x10) == 0x10) flags |= FlagsBit.H;
+        if (result < 0) flags |= FlagsBit.C;
 
         return (byte)result;
     }
@@ -316,6 +433,19 @@ file enum Op
     LoadSPHL,
     Push,
     Pop,
+
+    AddReg8,
+    AddHL,
+    AddImm8,
+    AdcReg8,
+    AdcHL,
+    AdcImm8,
+    SubReg8,
+    SubHL,
+    SubImm8,
+    SbcReg8,
+    SbcHL,
+    SbcImm8,
 }
 
 file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Src = byte.MaxValue)
@@ -430,8 +560,93 @@ file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Sr
                 }
             }
 
+            case 0b10: {
+                var identifier = (byte)((opcode >> 3) & 0b111);
+                var operand = (byte)(opcode & 0b111);
+
+                switch (identifier) {
+                    case 0b000: {
+                        // Add register8
+                        // 7 6  5 4 3  2 1 0
+                        // 1 0  0 0 0  [src]
+                        if (operand == 0b110) {
+                            return new Instruction(Op.AddHL, Src: (byte)Register8.Z);
+                        }
+                        else {
+                            return new Instruction(Op.AddReg8, Src: ToReg8(operand));
+                        }
+                    }
+
+                    case 0b001: {
+                        // Add register8 with carry
+                        // 7 6  5 4 3  2 1 0
+                        // 1 0  0 0 1  [src]
+                        if (operand == 0b110) {
+                            return new Instruction(Op.AdcHL, Src: (byte)Register8.Z);
+                        }
+                        else {
+                            return new Instruction(Op.AdcReg8, Src: ToReg8(operand));
+                        }
+                    }
+
+                    case 0b010: {
+                        // Subtract from register8
+                        // 7 6  5 4 3  2 1 0
+                        // 1 0  0 1 0  [src]
+                        if (operand == 0b110) {
+                            return new Instruction(Op.SubHL, Src: (byte)Register8.Z);
+                        }
+                        else {
+                            return new Instruction(Op.SubReg8, Src: ToReg8(operand));
+                        }
+                    }
+
+                    case 0b011: {
+                        // Subtract from register8 with carry
+                        // 7 6  5 4 3  2 1 0
+                        // 1 0  0 1 1  [src]
+                        if (operand == 0b110) {
+                            return new Instruction(Op.SbcHL, Src: (byte)Register8.Z);
+                        }
+                        else {
+                            return new Instruction(Op.SbcReg8, Src: ToReg8(operand));
+                        }
+                    }
+                }
+
+                break;
+            }
+
             case 0b11: {
                 switch (opcode & 0b111111) {
+                    case 0b000110: {
+                        // Add immediate8
+                        // 7 6  5 4 3  2 1 0
+                        // 1 1  0 0 0  1 1 0
+                        return new Instruction(Op.AddImm8, Src: (byte)Register8.Z);
+                    }
+
+                    case 0b001110: {
+                        // Add immediate8 with carry
+                        // 7 6  5 4 3 2 1 0
+                        // 1 1  0 0 1 1 1 0
+                        return new Instruction(Op.AdcImm8, Src: (byte)Register8.Z);
+                    }
+
+                    case 0b010110: {
+                        // Subtract from immediate8
+                        // 7 6  5 4 3 2 1 0
+                        // 1 1  0 1 0 1 1 0
+                        return new Instruction(Op.SubImm8, Src: (byte)Register8.Z);
+                    }
+
+                    case 0b011110: {
+                        // Subtract from immediate8 with carry
+                        // 7 6  5 4 3 2 1 0
+                        // 1 1  0 1 1 1 1 0
+                        return new Instruction(Op.SbcImm8, Src: (byte)Register8.Z);
+                    }
+
                     case 0b000001:
                     case 0b010001:
                     case 0b100001:

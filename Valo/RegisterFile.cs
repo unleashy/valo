@@ -143,4 +143,9 @@ public readonly ref struct FlagsRegister
             _reg.F &= (byte)~bits;
         }
     }
+
+    public void Replace(FlagsBit bits)
+    {
+        _reg.F = (byte)bits;
+    }
 }
