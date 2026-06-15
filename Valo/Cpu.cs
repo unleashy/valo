@@ -635,474 +635,130 @@ file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Sr
 {
     public static Instruction Decode(byte opcode)
     {
-        var block = (byte)(opcode >> 6);
+        var x = (byte)((opcode >> 6) & 0b11);
+        var y = (byte)((opcode >> 3) & 0b111);
+        var z = (byte)((opcode >> 0) & 0b111);
+        var p = (byte)((y >> 1) & 0b11);
+        var q = (byte)((y >> 0) & 0b1);
 
-        switch (block) {
-            case 0b00: {
-                var subblock = (byte)(opcode & 0b1111);
+        return (x, z, y, q, p) switch {
+            #region x == 0
+            (0, 0, 0, _, _) => new Instruction(Op.NoOp),
+            (0, 0, 1, _, _) => new Instruction(Op.LoadInd16SP),
 
-                switch (subblock) {
-                    case 0b0000: {
-                        // No operation
-                        // 7 6 5 4 3 2 1 0
-                        // 0 0 0 0 0 0 0 0
-                        return new Instruction(Op.NoOp);
-                    }
+            (0, 1, _, 0, _) => new Instruction(Op.LoadImm16, Dst: ToReg16(p)),
 
-                    case 0b0001: {
-                        // Load register16 from immediate16
-                        // 7 6   5 4   3 2 1 0
-                        // 0 0  [dst]  0 0 0 1
-                        var dst = (byte)((opcode >> 4) & 0b11);
+            (0, 2, _, 0, 0) => new Instruction(Op.LoadInd16A, Dst: (byte)Register16.BC),
+            (0, 2, _, 0, 1) => new Instruction(Op.LoadInd16A, Dst: (byte)Register16.DE),
+            (0, 2, _, 0, 2) => new Instruction(Op.LoadIncHLA),
+            (0, 2, _, 0, 3) => new Instruction(Op.LoadDecHLA),
+            (0, 2, _, 1, 0) => new Instruction(Op.LoadAInd16, Src: (byte)Register16.BC),
+            (0, 2, _, 1, 1) => new Instruction(Op.LoadAInd16, Src: (byte)Register16.DE),
+            (0, 2, _, 1, 2) => new Instruction(Op.LoadAIncHL),
+            (0, 2, _, 1, 3) => new Instruction(Op.LoadADecHL),
 
-                        return new Instruction(Op.LoadImm16, ToReg16(dst));
-                    }
+            (0, 4, 6, _, _) => new Instruction(Op.IncHL),
+            (0, 4, _, _, _) => new Instruction(Op.IncReg8, Dst: ToReg8(y)),
+            (0, 5, 6, _, _) => new Instruction(Op.DecHL),
+            (0, 5, _, _, _) => new Instruction(Op.DecReg8, Dst: ToReg8(y)),
 
-                    case 0b0010: {
-                        // Load indirect16 from A
-                        // 7 6  5 4    3 2 1 0
-                        // 0 0  [dst]  0 0 1 0
-                        var operand = (byte)((opcode >> 4) & 0b11);
+            (0, 6, 6, _, _) => new Instruction(Op.LoadIndHLImm8),
+            (0, 6, _, _, _) => new Instruction(Op.LoadImm8, Dst: ToReg8(y)),
 
-                        return operand switch {
-                            0b00 => new Instruction(Op.LoadInd16A, Dst: (byte) Register16.BC),
-                            0b01 => new Instruction(Op.LoadInd16A, Dst: (byte) Register16.DE),
-                            0b10 => new Instruction(Op.LoadIncHLA),
-                            0b11 => new Instruction(Op.LoadDecHLA),
-                            _    => throw new UnreachableException(),
-                        };
-                    }
+            (0, 7, 4, _, _) => new Instruction(Op.Daa),
+            (0, 7, 5, _, _) => new Instruction(Op.Cpl),
+            (0, 7, 6, _, _) => new Instruction(Op.Scf),
+            (0, 7, 7, _, _) => new Instruction(Op.Ccf),
+            #endregion
 
-                    case 0b1000: {
-                        // Load SP from indirect immediate16
-                        // 7 6  5 4  3 2 1 0
-                        // 0 0  0 0  1 0 0 0
-                        return new Instruction(Op.LoadInd16SP);
-                    }
+            #region x == 1
+            (1, _, 6, _, _) => new Instruction(Op.LoadIndHLReg8, Src: ToReg8(z)),
+            (1, 6, _, _, _) => new Instruction(Op.LoadReg8IndHL, Dst: ToReg8(y)),
+            (1, _, _, _, _) => new Instruction(Op.LoadReg8, Dst: ToReg8(y), Src: ToReg8(z)),
+            #endregion
 
-                    case 0b1010: {
-                        // Load A from indirect16
-                        // 7 6  5 4    3 2 1 0
-                        // 0 0  [src]  1 0 1 0
-                        var operand = (byte)((opcode >> 4) & 0b11);
+            #region x == 2
+            (2, 6, 0, _, _) => new Instruction(Op.AddHL, Src: (byte)Register8.Z),
+            (2, _, 0, _, _) => new Instruction(Op.AddReg8, Src: ToReg8(z)),
 
-                        return operand switch {
-                            0b00 => new Instruction(Op.LoadAInd16, Src: (byte) Register16.BC),
-                            0b01 => new Instruction(Op.LoadAInd16, Src: (byte) Register16.DE),
-                            0b10 => new Instruction(Op.LoadAIncHL),
-                            0b11 => new Instruction(Op.LoadADecHL),
-                            _    => throw new UnreachableException(),
-                        };
-                    }
+            (2, 6, 1, _, _) => new Instruction(Op.AdcHL, Src: (byte)Register8.Z),
+            (2, _, 1, _, _) => new Instruction(Op.AdcReg8, Src: ToReg8(z)),
 
-                    case 0b0100:
-                    case 0b1100: {
-                        var dst = (byte)((opcode >> 3) & 0b111);
+            (2, 6, 2, _, _) => new Instruction(Op.SubHL, Src: (byte)Register8.Z),
+            (2, _, 2, _, _) => new Instruction(Op.SubReg8, Src: ToReg8(z)),
 
-                        if (dst == 0b110) {
-                            // Increment indirect HL
-                            // 7 6  5 4 3  2 1 0
-                            // 0 0  1 1 0  1 0 0
-                            return new Instruction(Op.IncHL);
-                        }
-                        else {
-                            // Increment register8
-                            // 7 6  5 4 3  2 1 0
-                            // 0 0  [dst]  1 0 0
-                            return new Instruction(Op.IncReg8, ToReg8(dst));
-                        }
-                    }
+            (2, 6, 3, _, _) => new Instruction(Op.SbcHL, Src: (byte)Register8.Z),
+            (2, _, 3, _, _) => new Instruction(Op.SbcReg8, Src: ToReg8(z)),
 
-                    case 0b0101:
-                    case 0b1101: {
-                        var dst = (byte)((opcode >> 3) & 0b111);
+            (2, 6, 4, _, _) => new Instruction(Op.AndHL, Src: (byte)Register8.Z),
+            (2, _, 4, _, _) => new Instruction(Op.AndReg8, Src: ToReg8(z)),
 
-                        if (dst == 0b110) {
-                            // Decrement indirect HL
-                            // 7 6  5 4 3  2 1 0
-                            // 0 0  1 1 0  1 0 1
-                            return new Instruction(Op.DecHL);
-                        }
-                        else {
-                            // Decrement register8
-                            // 7 6  5 4 3  2 1 0
-                            // 0 0  [dst]  1 0 1
-                            return new Instruction(Op.DecReg8, ToReg8(dst));
-                        }
-                    }
+            (2, 6, 5, _, _) => new Instruction(Op.XorHL, Src: (byte)Register8.Z),
+            (2, _, 5, _, _) => new Instruction(Op.XorReg8, Src: ToReg8(z)),
 
-                    case 0b0110:
-                    case 0b1110: {
-                        var dst = (byte)((opcode >> 3) & 0b111);
+            (2, 6, 6, _, _) => new Instruction(Op.OrHL, Src: (byte)Register8.Z),
+            (2, _, 6, _, _) => new Instruction(Op.OrReg8, Src: ToReg8(z)),
 
-                        if (dst == 0b110) {
-                            // Load indirect HL from immediate8
-                            // 7 6  5 4 3  2 1 0
-                            // 0 0  1 1 0  1 1 0
-                            return new Instruction(Op.LoadIndHLImm8);
-                        }
-                        else {
-                            // Load register8 from immediate8
-                            // 7 6  5 4 3  2 1 0
-                            // 0 0  [dst]  1 1 0
-                            return new Instruction(Op.LoadImm8, ToReg8(dst));
-                        }
-                    }
+            (2, 6, 7, _, _) => new Instruction(Op.CpHL, Src: (byte)Register8.Z),
+            (2, _, 7, _, _) => new Instruction(Op.CpReg8, Src: ToReg8(z)),
+            #endregion
 
-                    case 0b0111: {
-                        var specifier = opcode >> 4;
+            #region x == 3
+            (3, 0, 4, _, _) => new Instruction(Op.LoadDirHighA),
+            (3, 0, 6, _, _) => new Instruction(Op.LoadADirHigh),
+            (3, 0, 7, _, _) => new Instruction(Op.LoadHLAdjustedSP),
 
-                        switch (specifier) {
-                            case 0b10: {
-                                // Decimal adjust accumulator
-                                // 7 6  5 4  3 2 1 0
-                                // 0 0  1 0  0 1 1 1
-                                return new Instruction(Op.Daa);
-                            }
+            (3, 1, _, 0, _) => new Instruction(Op.Pop, Dst: ToReg16Stack(p)),
+            (3, 1, _, 1, 3) => new Instruction(Op.LoadSPHL),
 
-                            case 0b11: {
-                                // Set carry flag
-                                // 7 6  5 4  3 2 1 0
-                                // 0 0  1 1  0 1 1 1
-                                return new Instruction(Op.Scf);
-                            }
-                        }
+            (3, 2, 4, _, _) => new Instruction(Op.LoadIndHighA),
+            (3, 2, 5, _, _) => new Instruction(Op.LoadDir16A),
+            (3, 2, 6, _, _) => new Instruction(Op.LoadAIndHigh),
+            (3, 2, 7, _, _) => new Instruction(Op.LoadADir16),
 
-                        break;
-                    }
+            (3, 5, _, 0, _) => new Instruction(Op.Push, Src: ToReg16Stack(p)),
 
-                    case 0b1111: {
-                        var specifier = opcode >> 4;
+            (3, 6, 0, _, _) => new Instruction(Op.AddImm8, Src: (byte)Register8.Z),
+            (3, 6, 1, _, _) => new Instruction(Op.AdcImm8, Src: (byte)Register8.Z),
+            (3, 6, 2, _, _) => new Instruction(Op.SubImm8, Src: (byte)Register8.Z),
+            (3, 6, 3, _, _) => new Instruction(Op.SbcImm8, Src: (byte)Register8.Z),
+            (3, 6, 4, _, _) => new Instruction(Op.AndImm8, Src: (byte)Register8.Z),
+            (3, 6, 5, _, _) => new Instruction(Op.XorImm8, Src: (byte)Register8.Z),
+            (3, 6, 6, _, _) => new Instruction(Op.OrImm8, Src: (byte)Register8.Z),
+            (3, 6, 7, _, _) => new Instruction(Op.CpImm8, Src: (byte)Register8.Z),
+            #endregion
 
-                        switch (specifier) {
-                            case 0b10: {
-                                // Complement accumulator
-                                // 7 6  5 4  3 2 1 0
-                                // 0 0  1 0  1 1 1 1
-                                return new Instruction(Op.Cpl);
-                            }
-
-                            case 0b11: {
-                                // Complement carry flag
-                                // 7 6  5 4  3 2 1 0
-                                // 0 0  1 1  1 1 1 1
-                                return new Instruction(Op.Ccf);
-                            }
-                        }
-
-                        break;
-                    }
-
-                    default: break;
-                }
-
-                break;
-            }
-
-            case 0b01: {
-                var dst = (byte)((opcode >> 3) & 0b111);
-                var src = (byte)(opcode & 0b111);
-
-                if (src == 0b110) {
-                    // Load register8 from indirect HL
-                    // 7 6  5 4 3  2 1 0
-                    // 0 1  [dst]  1 1 0
-                    return new Instruction(Op.LoadReg8IndHL, ToReg8(dst));
-                }
-                else if (dst == 0b110) {
-                    // Load indirect HL from register8
-                    // 7 6  5 4 3  2 1 0
-                    // 0 1  1 1 0  [src]
-                    return new Instruction(Op.LoadIndHLReg8, Src: ToReg8(src));
-                }
-                else {
-                    // Load register8 from register8
-                    // 7 6  5 4 3  2 1 0
-                    // 0 1  [dst]  [src]
-                    return new Instruction(Op.LoadReg8, ToReg8(dst), ToReg8(src));
-                }
-            }
-
-            case 0b10: {
-                var identifier = (byte)((opcode >> 3) & 0b111);
-                var operand = (byte)(opcode & 0b111);
-
-                switch (identifier) {
-                    case 0b000: {
-                        // Add register8
-                        // 7 6  5 4 3  2 1 0
-                        // 1 0  0 0 0  [src]
-                        if (operand == 0b110) {
-                            return new Instruction(Op.AddHL, Src: (byte)Register8.Z);
-                        }
-                        else {
-                            return new Instruction(Op.AddReg8, Src: ToReg8(operand));
-                        }
-                    }
-
-                    case 0b001: {
-                        // Add register8 with carry
-                        // 7 6  5 4 3  2 1 0
-                        // 1 0  0 0 1  [src]
-                        if (operand == 0b110) {
-                            return new Instruction(Op.AdcHL, Src: (byte)Register8.Z);
-                        }
-                        else {
-                            return new Instruction(Op.AdcReg8, Src: ToReg8(operand));
-                        }
-                    }
-
-                    case 0b010: {
-                        // Subtract from register8
-                        // 7 6  5 4 3  2 1 0
-                        // 1 0  0 1 0  [src]
-                        if (operand == 0b110) {
-                            return new Instruction(Op.SubHL, Src: (byte)Register8.Z);
-                        }
-                        else {
-                            return new Instruction(Op.SubReg8, Src: ToReg8(operand));
-                        }
-                    }
-
-                    case 0b011: {
-                        // Subtract from register8 with carry
-                        // 7 6  5 4 3  2 1 0
-                        // 1 0  0 1 1  [src]
-                        if (operand == 0b110) {
-                            return new Instruction(Op.SbcHL, Src: (byte)Register8.Z);
-                        }
-                        else {
-                            return new Instruction(Op.SbcReg8, Src: ToReg8(operand));
-                        }
-                    }
-
-                    case 0b100: {
-                        // Logical AND register8
-                        // 7 6  5 4 3  2 1 0
-                        // 1 0  1 0 0  [src]
-                        if (operand == 0b110) {
-                            return new Instruction(Op.AndHL, Src: (byte)Register8.Z);
-                        }
-                        else {
-                            return new Instruction(Op.AndReg8, Src: ToReg8(operand));
-                        }
-                    }
-
-                    case 0b101: {
-                        // Logical XOR register8
-                        // 7 6  5 4 3  2 1 0
-                        // 1 0  1 0 1  [src]
-                        if (operand == 0b110) {
-                            return new Instruction(Op.XorHL, Src: (byte)Register8.Z);
-                        }
-                        else {
-                            return new Instruction(Op.XorReg8, Src: ToReg8(operand));
-                        }
-                    }
-
-                    case 0b110: {
-                        // Logical OR register8
-                        // 7 6  5 4 3  2 1 0
-                        // 1 0  1 1 0  [src]
-                        if (operand == 0b110) {
-                            return new Instruction(Op.OrHL, Src: (byte)Register8.Z);
-                        }
-                        else {
-                            return new Instruction(Op.OrReg8, Src: ToReg8(operand));
-                        }
-                    }
-
-                    case 0b111: {
-                        // Compare register8
-                        // 7 6  5 4 3  2 1 0
-                        // 1 0  1 1 1  [src]
-                        if (operand == 0b110) {
-                            return new Instruction(Op.CpHL, Src: (byte)Register8.Z);
-                        }
-                        else {
-                            return new Instruction(Op.CpReg8, Src: ToReg8(operand));
-                        }
-                    }
-                }
-
-                break;
-            }
-
-            case 0b11: {
-                switch (opcode & 0b111111) {
-                    case 0b000110: {
-                        // Add immediate8
-                        // 7 6  5 4 3  2 1 0
-                        // 1 1  0 0 0  1 1 0
-                        return new Instruction(Op.AddImm8, Src: (byte)Register8.Z);
-                    }
-
-                    case 0b001110: {
-                        // Add immediate8 with carry
-                        // 7 6  5 4 3 2 1 0
-                        // 1 1  0 0 1 1 1 0
-                        return new Instruction(Op.AdcImm8, Src: (byte)Register8.Z);
-                    }
-
-                    case 0b010110: {
-                        // Subtract from immediate8
-                        // 7 6  5 4 3 2 1 0
-                        // 1 1  0 1 0 1 1 0
-                        return new Instruction(Op.SubImm8, Src: (byte)Register8.Z);
-                    }
-
-                    case 0b011110: {
-                        // Subtract from immediate8 with carry
-                        // 7 6  5 4 3 2 1 0
-                        // 1 1  0 1 1 1 1 0
-                        return new Instruction(Op.SbcImm8, Src: (byte)Register8.Z);
-                    }
-
-                    case 0b100110: {
-                        // Logical AND immediate8
-                        // 7 6  5 4 3 2 1 0
-                        // 1 1  1 0 0 1 1 0
-                        return new Instruction(Op.AndImm8, Src: (byte)Register8.Z);
-                    }
-
-                    case 0b110110: {
-                        // Logical OR immediate8
-                        // 7 6  5 4 3 2 1 0
-                        // 1 1  1 1 0 1 1 0
-                        return new Instruction(Op.OrImm8, Src: (byte)Register8.Z);
-                    }
-
-                    case 0b101110: {
-                        // Logical XOR immediate8
-                        // 7 6  5 4 3 2 1 0
-                        // 1 1  1 0 1 1 1 0
-                        return new Instruction(Op.XorImm8, Src: (byte)Register8.Z);
-                    }
-
-                    case 0b111110: {
-                        // Compare immediate8
-                        // 7 6  5 4 3 2 1 0
-                        // 1 1  1 1 1 1 1 0
-                        return new Instruction(Op.CpImm8, Src: (byte)Register8.Z);
-                    }
-
-                    case 0b000001:
-                    case 0b010001:
-                    case 0b100001:
-                    case 0b110001: {
-                        // Pop from stack to register16
-                        // 7 6   5 4   3 2 1 0
-                        // 1 1  [src]  0 1 0 1
-                        var dst = (byte)((opcode >> 4) & 0b11);
-                        return new Instruction(Op.Pop, Dst: ToReg16Stack(dst));
-                    }
-
-                    case 0b000101:
-                    case 0b010101:
-                    case 0b100101:
-                    case 0b110101: {
-                        // Push register16 to stack
-                        // 7 6   5 4   3 2 1 0
-                        // 1 1  [src]  0 1 0 1
-                        var src = (byte)((opcode >> 4) & 0b11);
-                        return new Instruction(Op.Push, Src: ToReg16Stack(src));
-                    }
-
-                    case 0b101010: {
-                        // Load direct immediate16 from A
-                        // 7 6  5 4 3 2 1 0
-                        // 1 1  1 0 1 0 1 0
-                        return new Instruction(Op.LoadDir16A);
-                    }
-
-                    case 0b111000: {
-                        // Load HL from adjusted SP
-                        // 7 6  5 4 3 2 1 0
-                        // 1 1  1 1 1 0 0 0
-                        return new Instruction(Op.LoadHLAdjustedSP);
-                    }
-
-                    case 0b111001: {
-                        // Load SP from HL
-                        // 7 6  5 4 3 2 1 0
-                        // 1 1  1 1 1 0 0 1
-                        return new Instruction(Op.LoadSPHL);
-                    }
-
-                    case 0b111010: {
-                        // Load A from direct immediate16
-                        // 7 6  5 4 3 2 1 0
-                        // 1 1  1 1 1 0 1 0
-                        return new Instruction(Op.LoadADir16);
-                    }
-
-                    case 0b110010: {
-                        // Load A from indirect $FF00 + C
-                        // 7 6  5 4 3 2 1 0
-                        // 1 1  1 1 0 0 1 0
-                        return new Instruction(Op.LoadAIndHigh);
-                    }
-
-                    case 0b100010: {
-                        // Load indirect $FF00 + C from A
-                        // 7 6  5 4 3 2 1 0
-                        // 1 1  1 0 0 0 1 0
-                        return new Instruction(Op.LoadIndHighA);
-                    }
-
-                    case 0b110000: {
-                        // Load A from indirect $FF00 + immediate
-                        // 7 6  5 4 3 2 1 0
-                        // 1 1  1 1 0 0 0 0
-                        return new Instruction(Op.LoadADirHigh);
-                    }
-
-                    case 0b100000: {
-                        // Load indirect $FF00 + immediate from A
-                        // 7 6  5 4 3 2 1 0
-                        // 1 1  1 0 0 0 0 0
-                        return new Instruction(Op.LoadDirHighA);
-                    }
-
-                    default: break;
-                }
-
-                break;
-            }
-
-            default: break;
-        }
-
-        throw new UnreachableException($"Missing decoder for opcode 0x{opcode:X2}");
-
-        static byte ToReg8(byte placeholder) =>
-            placeholder switch {
-                0 => (byte)Register8.B,
-                1 => (byte)Register8.C,
-                2 => (byte)Register8.D,
-                3 => (byte)Register8.E,
-                4 => (byte)Register8.H,
-                5 => (byte)Register8.L,
-                7 => (byte)Register8.A,
-                _ => throw new ArgumentException($"Not a Register8 placeholder: {placeholder}"),
-            };
-
-        static byte ToReg16(byte placeholder) =>
-            placeholder switch {
-                0 => (byte)Register16.BC,
-                1 => (byte)Register16.DE,
-                2 => (byte)Register16.HL,
-                3 => (byte)Register16.SP,
-                _ => throw new ArgumentException($"Not a Register16 placeholder: {placeholder}"),
-            };
-
-        static byte ToReg16Stack(byte placeholder) =>
-            placeholder switch {
-                0 => (byte)Register16.BC,
-                1 => (byte)Register16.DE,
-                2 => (byte)Register16.HL,
-                3 => (byte)Register16.AF,
-                _ => throw new ArgumentException($"Not a Register16 placeholder: {placeholder}"),
-            };
+            _ => throw new UnreachableException($"Missing decoder for opcode 0x{opcode:X2}"),
+        };
     }
+
+    private static byte ToReg8(byte placeholder) =>
+        placeholder switch {
+            0 => (byte)Register8.B,
+            1 => (byte)Register8.C,
+            2 => (byte)Register8.D,
+            3 => (byte)Register8.E,
+            4 => (byte)Register8.H,
+            5 => (byte)Register8.L,
+            7 => (byte)Register8.A,
+            _ => throw new ArgumentException($"Not a Register8 placeholder: {placeholder}"),
+        };
+
+    private static byte ToReg16(byte placeholder) =>
+        placeholder switch {
+            0 => (byte)Register16.BC,
+            1 => (byte)Register16.DE,
+            2 => (byte)Register16.HL,
+            3 => (byte)Register16.SP,
+            _ => throw new ArgumentException($"Not a Register16 placeholder: {placeholder}"),
+        };
+
+    private static byte ToReg16Stack(byte placeholder) =>
+        placeholder switch {
+            0 => (byte)Register16.BC,
+            1 => (byte)Register16.DE,
+            2 => (byte)Register16.HL,
+            3 => (byte)Register16.AF,
+            _ => throw new ArgumentException($"Not a Register16 placeholder: {placeholder}"),
+        };
 }
