@@ -306,7 +306,7 @@ public sealed class Cpu
                         Adc(
                             _reg.A,
                             _reg[(Register8)instr.Src],
-                            carry: _reg.Flags.IsSet(FlagsBit.C),
+                            carry: _reg.Flags.C,
                             out var flags
                         );
                     _reg.Flags.Replace(flags);
@@ -353,7 +353,7 @@ public sealed class Cpu
                     _reg.A = Sbc(
                         _reg.A,
                         _reg[(Register8)instr.Src],
-                        carry: _reg.Flags.IsSet(FlagsBit.C),
+                        carry: _reg.Flags.C,
                         out var flags
                     );
                     _reg.Flags.Replace(flags);
@@ -422,7 +422,7 @@ public sealed class Cpu
                 case Op.Ccf: {
                     _reg.Flags.Apply(
                         FlagsBit.N | FlagsBit.H | FlagsBit.C,
-                        _reg.Flags.IsSet(FlagsBit.C) ? 0 : FlagsBit.C
+                        _reg.Flags.C ? 0 : FlagsBit.C
                     );
                     break;
                 }
@@ -442,7 +442,9 @@ public sealed class Cpu
                 }
 
                 case Op.Daa: {
-                    var (_, negative, halfcarry, carry) = _reg.Flags.Split();
+                    var negative = _reg.Flags.N;
+                    var halfcarry = _reg.Flags.H;
+                    var carry = _reg.Flags.C;
 
                     // Adapted from https://www.reddit.com/r/EmuDev/comments/4ycoix/a_guide_to_the_gameboys_halfcarry_flag/d6p619w/
                     var adjustment = 0;
@@ -524,6 +526,42 @@ public sealed class Cpu
                     break;
                 }
 
+                case Op.Rlca: {
+                    _reg.A = byte.RotateLeft(_reg.A, 1);
+                    _reg.Flags.Replace((_reg.A & 1) == 1 ? FlagsBit.C : 0);
+                    break;
+                }
+
+                case Op.Rrca: {
+                    _reg.A = byte.RotateRight(_reg.A, 1);
+                    _reg.Flags.Replace((_reg.A >> 7) == 1 ? FlagsBit.C : 0);
+                    break;
+                }
+
+                case Op.Rla: {
+                    var before = _reg.A;
+                    _reg.A <<= 1;
+                    _reg.A = (byte)(_reg.Flags.C ? _reg.A | 1 : _reg.A & ~1);
+                    _reg.Flags.Replace((before >> 7) == 1 ? FlagsBit.C : 0);
+                    break;
+                }
+
+                case Op.Rra: {
+                    var before = _reg.A;
+                    _reg.A >>= 1;
+                    _reg.A = (byte)(_reg.Flags.C ? _reg.A | 0x80 : _reg.A & ~0x80);
+                    _reg.Flags.Replace((before & 1) == 1 ? FlagsBit.C : 0);
+                    break;
+                }
+
+                case Op.CbPrefix: {
+                    foreach (var r in ExecuteCb()) {
+                        yield return r;
+                    }
+
+                    break;
+                }
+
                 default: {
                     throw new UnreachableException(
                         $"Missing implementation for operation {instr.Op}"
@@ -533,6 +571,222 @@ public sealed class Cpu
 
             _reg.IR = Memory.Read(_reg.PC++);
             yield return true;
+        }
+    }
+
+    private IEnumerable<bool> ExecuteCb()
+    {
+        _reg.IR = Memory.Read(_reg.PC++);
+        yield return false;
+
+        var instr = Instruction.DecodeCb(_reg.IR);
+        switch (instr.Op) {
+            case Op.RlcReg8: {
+                var dst = (Register8)instr.Dst;
+                _reg[dst] = Rlc(_reg[dst], out var flags);
+                _reg.Flags.Replace(flags);
+                break;
+            }
+
+            case Op.RlcHL: {
+                _reg.Z = Memory.Read(_reg.HL);
+                yield return false;
+
+                var result = Rlc(_reg.Z, out var flags);
+                _reg.Flags.Replace(flags);
+
+                Memory.Write(_reg.HL, result);
+                yield return false;
+                break;
+            }
+
+            case Op.RrcReg8: {
+                var dst = (Register8)instr.Dst;
+                _reg[dst] = Rrc(_reg[dst], out var flags);
+                _reg.Flags.Replace(flags);
+                break;
+            }
+
+            case Op.RrcHL: {
+                _reg.Z = Memory.Read(_reg.HL);
+                yield return false;
+
+                var result = Rrc(_reg.Z, out var flags);
+                _reg.Flags.Replace(flags);
+
+                Memory.Write(_reg.HL, result);
+                yield return false;
+                break;
+            }
+
+            case Op.RlReg8: {
+                var dst = (Register8)instr.Dst;
+                _reg[dst] = Rl(_reg[dst], _reg.Flags.C, out var flags);
+                _reg.Flags.Replace(flags);
+                break;
+            }
+
+            case Op.RlHL: {
+                _reg.Z = Memory.Read(_reg.HL);
+                yield return false;
+
+                var result = Rl(_reg.Z, _reg.Flags.C, out var flags);
+                _reg.Flags.Replace(flags);
+
+                Memory.Write(_reg.HL, result);
+                yield return false;
+                break;
+            }
+
+            case Op.RrReg8: {
+                var dst = (Register8)instr.Dst;
+                _reg[dst] = Rr(_reg[dst], _reg.Flags.C, out var flags);
+                _reg.Flags.Replace(flags);
+                break;
+            }
+
+            case Op.RrHL: {
+                _reg.Z = Memory.Read(_reg.HL);
+                yield return false;
+
+                var result = Rr(_reg.Z, _reg.Flags.C, out var flags);
+                _reg.Flags.Replace(flags);
+
+                Memory.Write(_reg.HL, result);
+                yield return false;
+                break;
+            }
+
+            case Op.SlaReg8: {
+                var dst = (Register8)instr.Dst;
+                _reg[dst] = Sla(_reg[dst], out var flags);
+                _reg.Flags.Replace(flags);
+                break;
+            }
+
+            case Op.SlaHL: {
+                _reg.Z = Memory.Read(_reg.HL);
+                yield return false;
+
+                var result = Sla(_reg.Z, out var flags);
+                _reg.Flags.Replace(flags);
+
+                Memory.Write(_reg.HL, result);
+                yield return false;
+                break;
+            }
+
+            case Op.SraReg8: {
+                var dst = (Register8)instr.Dst;
+                _reg[dst] = Sra(_reg[dst], out var flags);
+                _reg.Flags.Replace(flags);
+                break;
+            }
+
+            case Op.SraHL: {
+                _reg.Z = Memory.Read(_reg.HL);
+                yield return false;
+
+                var result = Sra(_reg.Z, out var flags);
+                _reg.Flags.Replace(flags);
+
+                Memory.Write(_reg.HL, result);
+                yield return false;
+                break;
+            }
+
+            case Op.SrlReg8: {
+                var dst = (Register8)instr.Dst;
+                _reg[dst] = Srl(_reg[dst], out var flags);
+                _reg.Flags.Replace(flags);
+                break;
+            }
+
+            case Op.SrlHL: {
+                _reg.Z = Memory.Read(_reg.HL);
+                yield return false;
+
+                var result = Srl(_reg.Z, out var flags);
+                _reg.Flags.Replace(flags);
+
+                Memory.Write(_reg.HL, result);
+                yield return false;
+                break;
+            }
+
+            case Op.SwapReg8: {
+                var dst = (Register8)instr.Dst;
+                _reg[dst] = Swap(_reg[dst], out var flags);
+                _reg.Flags.Replace(flags);
+                break;
+            }
+
+            case Op.SwapHL: {
+                _reg.Z = Memory.Read(_reg.HL);
+                yield return false;
+
+                var result = Swap(_reg.Z, out var flags);
+                _reg.Flags.Replace(flags);
+
+                Memory.Write(_reg.HL, result);
+                yield return false;
+                break;
+            }
+
+            case Op.BitReg8: {
+                var value = _reg[(Register8)instr.Src];
+                Bit(value, instr.Dst);
+
+                break;
+            }
+
+            case Op.BitHL: {
+                _reg.Z = Memory.Read(_reg.HL);
+                yield return false;
+
+                Bit(_reg.Z, instr.Dst);
+                break;
+            }
+
+            case Op.ResReg8: {
+                var src = (Register8)instr.Src;
+                _reg[src] = Res(_reg[src], instr.Dst);
+                break;
+            }
+
+            case Op.ResHL: {
+                _reg.Z = Memory.Read(_reg.HL);
+                yield return false;
+
+                var result = Res(_reg.Z, instr.Dst);
+
+                Memory.Write(_reg.HL, result);
+                yield return false;
+                break;
+            }
+
+            case Op.SetReg8: {
+                var src = (Register8)instr.Src;
+                _reg[src] = Set(_reg[src], instr.Dst);
+                break;
+            }
+
+            case Op.SetHL: {
+                _reg.Z = Memory.Read(_reg.HL);
+                yield return false;
+
+                var result = Set(_reg.Z, instr.Dst);
+
+                Memory.Write(_reg.HL, result);
+                yield return false;
+                break;
+            }
+
+            default: {
+                throw new UnreachableException(
+                    $"Missing implementation for CB-prefixed operation {instr.Op}"
+                );
+            }
         }
     }
 
@@ -567,6 +821,107 @@ public sealed class Cpu
 
         return (byte)result;
     }
+
+    private static byte Rlc(byte value, out FlagsBit flags)
+    {
+        var result = byte.RotateLeft(value, 1);
+
+        flags = 0;
+        if ((result & 1) == 1) flags |= FlagsBit.C;
+        if (result == 0) flags |= FlagsBit.Z;
+
+        return result;
+    }
+
+    private static byte Rrc(byte value, out FlagsBit flags)
+    {
+        var result = byte.RotateRight(value, 1);
+
+        flags = 0;
+        if ((result >> 7) == 1) flags |= FlagsBit.C;
+        if (result == 0) flags |= FlagsBit.Z;
+
+        return result;
+    }
+
+    private static byte Rl(byte value, bool carry, out FlagsBit flags)
+    {
+        var result = (byte)(value << 1);
+        result = (byte)(carry ? (result | 1) : (result & ~1));
+
+        flags = 0;
+        if ((value >> 7) == 1) flags |= FlagsBit.C;
+        if (result == 0) flags |= FlagsBit.Z;
+
+        return result;
+    }
+
+    private static byte Rr(byte value, bool carry, out FlagsBit flags)
+    {
+        var result = (byte)(value >> 1);
+        result = (byte)(carry ? (result | 0x80) : (result & ~0x80));
+
+        flags = 0;
+        if ((value & 1) == 1) flags |= FlagsBit.C;
+        if (result == 0) flags |= FlagsBit.Z;
+
+        return result;
+    }
+
+    private static byte Sla(byte value, out FlagsBit flags)
+    {
+        var result = (byte)(value << 1);
+
+        flags = 0;
+        if ((value >> 7) == 1) flags |= FlagsBit.C;
+        if (result == 0) flags |= FlagsBit.Z;
+
+        return result;
+    }
+
+    private static byte Sra(byte value, out FlagsBit flags)
+    {
+        var result = (byte)((sbyte)value >> 1);
+
+        flags = 0;
+        if ((value & 1) == 1) flags |= FlagsBit.C;
+        if (result == 0) flags |= FlagsBit.Z;
+
+        return result;
+    }
+
+    private static byte Srl(byte value, out FlagsBit flags)
+    {
+        var result = (byte)(value >> 1);
+
+        flags = 0;
+        if ((value & 1) == 1) flags |= FlagsBit.C;
+        if (result == 0) flags |= FlagsBit.Z;
+
+        return result;
+    }
+
+    private static byte Swap(byte value, out FlagsBit flags)
+    {
+        var result = byte.RotateLeft(value, 4);
+
+        flags = result == 0 ? FlagsBit.Z : 0;
+
+        return result;
+    }
+
+    private void Bit(byte value, byte bit)
+    {
+        var test = ((value >> bit) & 1) == 0;
+        _reg.Flags.Apply(
+            FlagsBit.Z | FlagsBit.N | FlagsBit.H,
+            (test ? FlagsBit.Z : 0) | FlagsBit.H
+        );
+    }
+
+    private static byte Res(byte value, byte bit) => (byte)(value & ~(1 << bit));
+
+    private static byte Set(byte value, byte bit) => (byte)(value | (1 << bit));
 }
 
 file enum Op
@@ -629,6 +984,34 @@ file enum Op
     XorReg8,
     XorHL,
     XorImm8,
+    Rlca,
+    Rrca,
+    Rla,
+    Rra,
+
+    CbPrefix,
+    RlcReg8,
+    RlcHL,
+    RrcReg8,
+    RrcHL,
+    RlReg8,
+    RlHL,
+    RrReg8,
+    RrHL,
+    SlaReg8,
+    SlaHL,
+    SraReg8,
+    SraHL,
+    SwapReg8,
+    SwapHL,
+    SrlReg8,
+    SrlHL,
+    BitReg8,
+    BitHL,
+    ResReg8,
+    ResHL,
+    SetReg8,
+    SetHL,
 }
 
 file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Src = byte.MaxValue)
@@ -665,6 +1048,10 @@ file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Sr
             (0, 6, 6, _, _) => new Instruction(Op.LoadIndHLImm8),
             (0, 6, _, _, _) => new Instruction(Op.LoadImm8, Dst: ToReg8(y)),
 
+            (0, 7, 0, _, _) => new Instruction(Op.Rlca),
+            (0, 7, 1, _, _) => new Instruction(Op.Rrca),
+            (0, 7, 2, _, _) => new Instruction(Op.Rla),
+            (0, 7, 3, _, _) => new Instruction(Op.Rra),
             (0, 7, 4, _, _) => new Instruction(Op.Daa),
             (0, 7, 5, _, _) => new Instruction(Op.Cpl),
             (0, 7, 6, _, _) => new Instruction(Op.Scf),
@@ -716,6 +1103,8 @@ file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Sr
             (3, 2, 6, _, _) => new Instruction(Op.LoadAIndHigh),
             (3, 2, 7, _, _) => new Instruction(Op.LoadADir16),
 
+            (3, 3, 1, _, _) => new Instruction(Op.CbPrefix),
+
             (3, 5, _, 0, _) => new Instruction(Op.Push, Src: ToReg16Stack(p)),
 
             (3, 6, 0, _, _) => new Instruction(Op.AddImm8, Src: (byte)Register8.Z),
@@ -727,6 +1116,50 @@ file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Sr
             (3, 6, 6, _, _) => new Instruction(Op.OrImm8, Src: (byte)Register8.Z),
             (3, 6, 7, _, _) => new Instruction(Op.CpImm8, Src: (byte)Register8.Z),
             #endregion
+
+            _ => throw new UnreachableException($"Missing decoder for opcode 0x{opcode:X2}"),
+        };
+    }
+
+    public static Instruction DecodeCb(byte opcode)
+    {
+        var x = (byte)((opcode >> 6) & 0b11);
+        var y = (byte)((opcode >> 3) & 0b111);
+        var z = (byte)((opcode >> 0) & 0b111);
+
+        return (x, y, z) switch {
+            (0, 0, 6) => new Instruction(Op.RlcHL, Dst: (byte)Register8.Z),
+            (0, 0, _) => new Instruction(Op.RlcReg8, Dst: ToReg8(z)),
+
+            (0, 1, 6) => new Instruction(Op.RrcHL, Dst: (byte)Register8.Z),
+            (0, 1, _) => new Instruction(Op.RrcReg8, Dst: ToReg8(z)),
+
+            (0, 2, 6) => new Instruction(Op.RlHL, Dst: (byte)Register8.Z),
+            (0, 2, _) => new Instruction(Op.RlReg8, Dst: ToReg8(z)),
+
+            (0, 3, 6) => new Instruction(Op.RrHL, Dst: (byte)Register8.Z),
+            (0, 3, _) => new Instruction(Op.RrReg8, Dst: ToReg8(z)),
+
+            (0, 4, 6) => new Instruction(Op.SlaHL, Dst: (byte)Register8.Z),
+            (0, 4, _) => new Instruction(Op.SlaReg8, Dst: ToReg8(z)),
+
+            (0, 5, 6) => new Instruction(Op.SraHL, Dst: (byte)Register8.Z),
+            (0, 5, _) => new Instruction(Op.SraReg8, Dst: ToReg8(z)),
+
+            (0, 6, 6) => new Instruction(Op.SwapHL, Dst: (byte)Register8.Z),
+            (0, 6, _) => new Instruction(Op.SwapReg8, Dst: ToReg8(z)),
+
+            (0, 7, 6) => new Instruction(Op.SrlHL, Dst: (byte)Register8.Z),
+            (0, 7, _) => new Instruction(Op.SrlReg8, Dst: ToReg8(z)),
+
+            (1, _, 6) => new Instruction(Op.BitHL, Dst: y, Src: (byte)Register8.Z),
+            (1, _, _) => new Instruction(Op.BitReg8, Dst: y, Src: ToReg8(z)),
+
+            (2, _, 6) => new Instruction(Op.ResHL, Dst: y, Src: (byte)Register8.Z),
+            (2, _, _) => new Instruction(Op.ResReg8, Dst: y, Src: ToReg8(z)),
+
+            (3, _, 6) => new Instruction(Op.SetHL, Dst: y, Src: (byte)Register8.Z),
+            (3, _, _) => new Instruction(Op.SetReg8, Dst: y, Src: ToReg8(z)),
 
             _ => throw new UnreachableException($"Missing decoder for opcode 0x{opcode:X2}"),
         };

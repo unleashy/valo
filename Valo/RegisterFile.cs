@@ -132,6 +132,11 @@ public readonly ref struct FlagsRegister
 
     public bool IsSet(FlagsBit bit) => (_reg.F & bit) != 0;
 
+    public bool Z => IsSet(FlagsBit.Z);
+    public bool N => IsSet(FlagsBit.N);
+    public bool H => IsSet(FlagsBit.H);
+    public bool C => IsSet(FlagsBit.C);
+
     public void Set(FlagsBit bits)
     {
         _reg.F |= bits;
@@ -146,7 +151,4 @@ public readonly ref struct FlagsRegister
     {
         _reg.F = bits;
     }
-
-    public (bool Z, bool N, bool H, bool C) Split() =>
-        (IsSet(FlagsBit.Z), IsSet(FlagsBit.N), IsSet(FlagsBit.H), IsSet(FlagsBit.C));
 }
