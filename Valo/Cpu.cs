@@ -44,6 +44,7 @@ public sealed class Cpu
             switch (instr.Op) {
                 case Op.NoOp: break;
 
+                #region 8-bit load instructions
                 case Op.LoadReg8: {
                     _reg[(Register8)instr.Dst] = _reg[(Register8)instr.Src];
                     break;
@@ -188,7 +189,9 @@ public sealed class Cpu
 
                     break;
                 }
+                #endregion 8-bit load instructions
 
+                #region 16-bit load instructions
                 case Op.LoadImm16: {
                     _reg.Z = Memory.Read(_reg.PC++);
                     yield return false;
@@ -234,26 +237,6 @@ public sealed class Cpu
                     break;
                 }
 
-                case Op.AddSPImm8: {
-                    _reg.Z = Memory.Read(_reg.PC++);
-                    var adj = _reg.Z > sbyte.MaxValue ? byte.MaxValue : 0;
-                    yield return false;
-
-                    var (sph, spl) = _reg.Split(Register16.SP);
-
-                    _reg.Z = Add(spl, _reg.Z, out var flags);
-                    _reg.Flags.Replace(flags);
-                    _reg.Flags.Reset(FlagsBit.Z);
-                    yield return false;
-
-                    _reg.W = (byte)(sph + adj + (_reg.Flags.C ? 1 : 0));
-                    yield return false;
-
-                    _reg.SP = _reg.WZ;
-
-                    break;
-                }
-
                 case Op.LoadSPHL: {
                     _reg.SP = _reg.HL;
                     yield return false;
@@ -286,7 +269,9 @@ public sealed class Cpu
                     _reg[(Register16)instr.Dst] = _reg.WZ;
                     break;
                 }
+                #endregion 16-bit load instructions
 
+                #region 8-bit arithmetic instructions
                 case Op.AddHL: {
                     _reg[(Register8)instr.Src] = Memory.Read(_reg.HL);
                     yield return false;
@@ -304,19 +289,6 @@ public sealed class Cpu
                 case Op.AddReg8: {
                     _reg.A = Add(_reg.A, _reg[(Register8)instr.Src], out var flags);
                     _reg.Flags.Replace(flags);
-
-                    break;
-                }
-
-                case Op.AddHLReg16: {
-                    var (msb, lsb) = _reg.Split((Register16)instr.Src);
-
-                    _reg.L = Add(_reg.L, lsb, out var flags);
-                    _reg.Flags.Apply(FlagsBit.N | FlagsBit.H | FlagsBit.C, flags);
-                    yield return false;
-
-                    _reg.H = Adc(_reg.H, msb, _reg.Flags.C, out flags);
-                    _reg.Flags.Apply(FlagsBit.H | FlagsBit.C, flags);
 
                     break;
                 }
@@ -434,20 +406,6 @@ public sealed class Cpu
                     break;
                 }
 
-                case Op.IncReg16: {
-                    ++_reg[(Register16)instr.Dst];
-                    yield return false;
-
-                    break;
-                }
-
-                case Op.DecReg16: {
-                    --_reg[(Register16)instr.Dst];
-                    yield return false;
-
-                    break;
-                }
-
                 case Op.DecReg8: {
                     _reg[(Register8)instr.Dst] = Sub(_reg[(Register8)instr.Dst], 1, out var flags);
                     _reg.Flags.Apply(FlagsBit.Z | FlagsBit.N | FlagsBit.H, flags);
@@ -513,7 +471,9 @@ public sealed class Cpu
 
                     break;
                 }
+                #endregion 8-bit arithmetic instructions
 
+                #region 8-bit logical instructions
                 case Op.AndHL: {
                     _reg[(Register8)instr.Src] = Memory.Read(_reg.HL);
                     yield return false;
@@ -609,6 +569,57 @@ public sealed class Cpu
 
                     break;
                 }
+                #endregion 8-bit logical instructions
+
+                #region 16-bit arithmetic instructions
+                case Op.AddHLReg16: {
+                    var (msb, lsb) = _reg.Split((Register16)instr.Src);
+
+                    _reg.L = Add(_reg.L, lsb, out var flags);
+                    _reg.Flags.Apply(FlagsBit.N | FlagsBit.H | FlagsBit.C, flags);
+                    yield return false;
+
+                    _reg.H = Adc(_reg.H, msb, _reg.Flags.C, out flags);
+                    _reg.Flags.Apply(FlagsBit.H | FlagsBit.C, flags);
+
+                    break;
+                }
+
+
+                case Op.IncReg16: {
+                    ++_reg[(Register16)instr.Dst];
+                    yield return false;
+
+                    break;
+                }
+
+                case Op.DecReg16: {
+                    --_reg[(Register16)instr.Dst];
+                    yield return false;
+
+                    break;
+                }
+
+                case Op.AddSPImm8: {
+                    _reg.Z = Memory.Read(_reg.PC++);
+                    var adj = _reg.Z > sbyte.MaxValue ? byte.MaxValue : 0;
+                    yield return false;
+
+                    var (sph, spl) = _reg.Split(Register16.SP);
+
+                    _reg.Z = Add(spl, _reg.Z, out var flags);
+                    _reg.Flags.Replace(flags);
+                    _reg.Flags.Reset(FlagsBit.Z);
+                    yield return false;
+
+                    _reg.W = (byte)(sph + adj + (_reg.Flags.C ? 1 : 0));
+                    yield return false;
+
+                    _reg.SP = _reg.WZ;
+
+                    break;
+                }
+                #endregion
 
                 default: {
                     throw new UnreachableException(
