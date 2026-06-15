@@ -14,7 +14,6 @@ public enum Register8
     W = 9, Z = 8,
     IR = 10,
     IME = 11,
-    SPH = 15, SPL = 14,
 }
 
 [SuppressMessage("ReSharper", "InconsistentNaming")]
@@ -140,6 +139,11 @@ public readonly ref struct FlagsRegister
     public void Set(FlagsBit bits)
     {
         _reg.F |= bits;
+    }
+
+    public void Reset(FlagsBit bits)
+    {
+        _reg.F &= ~bits;
     }
 
     public void Apply(FlagsBit affected, FlagsBit bits)

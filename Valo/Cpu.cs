@@ -225,10 +225,31 @@ public sealed class Cpu
 
                     _reg.L = Add(spl, _reg.Z, out var flags);
                     _reg.Flags.Replace(flags);
+                    _reg.Flags.Reset(FlagsBit.Z);
                     yield return false;
 
                     var adj = _reg.Z > sbyte.MaxValue ? byte.MaxValue : 0;
-                    _reg.H = (byte)(sph + adj + (flags.HasFlag(FlagsBit.C) ? 1 : 0));
+                    _reg.H = (byte)(sph + adj + (_reg.Flags.C ? 1 : 0));
+
+                    break;
+                }
+
+                case Op.AddSPImm8: {
+                    _reg.Z = Memory.Read(_reg.PC++);
+                    var adj = _reg.Z > sbyte.MaxValue ? byte.MaxValue : 0;
+                    yield return false;
+
+                    var (sph, spl) = _reg.Split(Register16.SP);
+
+                    _reg.Z = Add(spl, _reg.Z, out var flags);
+                    _reg.Flags.Replace(flags);
+                    _reg.Flags.Reset(FlagsBit.Z);
+                    yield return false;
+
+                    _reg.W = (byte)(sph + adj + (_reg.Flags.C ? 1 : 0));
+                    yield return false;
+
+                    _reg.SP = _reg.WZ;
 
                     break;
                 }
@@ -283,6 +304,19 @@ public sealed class Cpu
                 case Op.AddReg8: {
                     _reg.A = Add(_reg.A, _reg[(Register8)instr.Src], out var flags);
                     _reg.Flags.Replace(flags);
+
+                    break;
+                }
+
+                case Op.AddHLReg16: {
+                    var (msb, lsb) = _reg.Split((Register16)instr.Src);
+
+                    _reg.L = Add(_reg.L, lsb, out var flags);
+                    _reg.Flags.Apply(FlagsBit.N | FlagsBit.H | FlagsBit.C, flags);
+                    yield return false;
+
+                    _reg.H = Adc(_reg.H, msb, _reg.Flags.C, out flags);
+                    _reg.Flags.Apply(FlagsBit.H | FlagsBit.C, flags);
 
                     break;
                 }
@@ -397,6 +431,20 @@ public sealed class Cpu
 
                     Memory.Write(_reg.HL, result);
                     yield return false;
+                    break;
+                }
+
+                case Op.IncReg16: {
+                    ++_reg[(Register16)instr.Dst];
+                    yield return false;
+
+                    break;
+                }
+
+                case Op.DecReg16: {
+                    --_reg[(Register16)instr.Dst];
+                    yield return false;
+
                     break;
                 }
 
@@ -954,6 +1002,8 @@ file enum Op
     AddReg8,
     AddHL,
     AddImm8,
+    AddHLReg16,
+    AddSPImm8,
     AdcReg8,
     AdcHL,
     AdcImm8,
@@ -968,7 +1018,9 @@ file enum Op
     CpImm8,
     IncReg8,
     IncHL,
+    IncReg16,
     DecReg8,
+    DecReg16,
     DecHL,
     Ccf,
     Scf,
@@ -1030,6 +1082,7 @@ file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Sr
             (0, 0, 1, _, _) => new Instruction(Op.LoadInd16SP),
 
             (0, 1, _, 0, _) => new Instruction(Op.LoadImm16, Dst: ToReg16(p)),
+            (0, 1, _, 1, _) => new Instruction(Op.AddHLReg16, Src: ToReg16(p)),
 
             (0, 2, _, 0, 0) => new Instruction(Op.LoadInd16A, Dst: (byte)Register16.BC),
             (0, 2, _, 0, 1) => new Instruction(Op.LoadInd16A, Dst: (byte)Register16.DE),
@@ -1039,6 +1092,9 @@ file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Sr
             (0, 2, _, 1, 1) => new Instruction(Op.LoadAInd16, Src: (byte)Register16.DE),
             (0, 2, _, 1, 2) => new Instruction(Op.LoadAIncHL),
             (0, 2, _, 1, 3) => new Instruction(Op.LoadADecHL),
+
+            (0, 3, _, 0, _) => new Instruction(Op.IncReg16, Dst: ToReg16(p)),
+            (0, 3, _, 1, _) => new Instruction(Op.DecReg16, Dst: ToReg16(p)),
 
             (0, 4, 6, _, _) => new Instruction(Op.IncHL),
             (0, 4, _, _, _) => new Instruction(Op.IncReg8, Dst: ToReg8(y)),
@@ -1092,6 +1148,7 @@ file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Sr
 
             #region x == 3
             (3, 0, 4, _, _) => new Instruction(Op.LoadDirHighA),
+            (3, 0, 5, _, _) => new Instruction(Op.AddSPImm8),
             (3, 0, 6, _, _) => new Instruction(Op.LoadADirHigh),
             (3, 0, 7, _, _) => new Instruction(Op.LoadHLAdjustedSP),
 

@@ -5,7 +5,7 @@ public class Cpu16BitLoadsTests : CpuTestsBase
     [Test]
     public void LoadImmediate16([ValueSource(nameof(StdRegister16))] Register16 dst)
     {
-        var opcode = (byte) (0b00_00_0001 | (EncodeStdRegister16(dst) << 4));
+        var opcode = (byte)(0b00_00_0001 | (EncodeStdRegister16(dst) << 4));
         var sut = new Cpu(
             new RegisterFile(),
             new Ram([opcode, 0xFE, 0xCA, 0])
@@ -54,24 +54,25 @@ public class Cpu16BitLoadsTests : CpuTestsBase
         });
     }
 
-    [TestCase(0xFF00, +0x42, 0)]
-    [TestCase(0xFF00, -0x42, 0)]
-    [TestCase(0xFFC0, +0x42, FlagsBit.C)]
-    [TestCase(0x0008, +0x08, FlagsBit.H)]
-    [TestCase(0xFFC0, +0x40, FlagsBit.C | FlagsBit.Z)]
-    [TestCase(0x00FF, -0x7F, FlagsBit.C | FlagsBit.H)]
-    public void LoadHLAdjustedSP(int sp, sbyte offset, FlagsBit flags)
+    [TestCase(0xFF00, +0x42, 0xFF42, 0)]
+    [TestCase(0xFF00, -0x42, 0xFEBE, 0)]
+    [TestCase(0xFFC0, +0x42, 0x0002, FlagsBit.C)]
+    [TestCase(0x0008, +0x08, 0x0010, FlagsBit.H)]
+    [TestCase(0xFFC0, +0x40, 0x0000, FlagsBit.C)]
+    [TestCase(0x00FF, -0x7F, 0x0080, FlagsBit.C | FlagsBit.H)]
+    [TestCase(0x0010, -0x01, 0x000F, FlagsBit.C)]
+    public void LoadHLAdjustedSP(int sp, sbyte offset, int expected, FlagsBit flags)
     {
         byte opcode = 0b11_111000;
         var sut = new Cpu(
-            new RegisterFile { SP = (ushort) sp },
-            new Rom([opcode, (byte) offset, 0])
+            new RegisterFile { SP = (ushort)sp, F = FlagsBit.Z | FlagsBit.N },
+            new Rom([opcode, (byte)offset, 0])
         );
 
         var cycles = sut.Step();
 
         Assert.Multiple(() => {
-            Assert.That(sut.Registers.HL, Is.EqualTo((ushort) (sp + offset)));
+            Assert.That(sut.Registers.HL, Is.EqualTo((ushort)expected));
             Assert.That(sut.Registers.F, Is.EqualTo(flags));
             Assert.That(cycles, Is.EqualTo(3));
         });
@@ -80,7 +81,7 @@ public class Cpu16BitLoadsTests : CpuTestsBase
     [Test]
     public void Push([ValueSource(nameof(StackRegister16))] Register16 src)
     {
-        var opcode = (byte) (0b11_00_0101 | (EncodeStackRegister16(src) << 4));
+        var opcode = (byte)(0b11_00_0101 | (EncodeStackRegister16(src) << 4));
         var sut = new Cpu(
             new RegisterFile { SP = 0x0004, [src] = 0xCAFE },
             new Ram([opcode, 0, 0, 0])
@@ -99,7 +100,7 @@ public class Cpu16BitLoadsTests : CpuTestsBase
     [Test]
     public void Pop([ValueSource(nameof(StackRegister16))] Register16 dst)
     {
-        var opcode = (byte) (0b11_00_0001 | (EncodeStackRegister16(dst) << 4));
+        var opcode = (byte)(0b11_00_0001 | (EncodeStackRegister16(dst) << 4));
         var sut = new Cpu(
             new RegisterFile { SP = 0x0002 },
             new Rom([opcode, 0, 0xFE, 0xCA])
