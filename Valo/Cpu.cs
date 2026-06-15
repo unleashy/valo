@@ -621,6 +621,169 @@ public sealed class Cpu
                 }
                 #endregion
 
+                #region Control flow instructions
+                case Op.Jp: {
+                    _reg.Z = Memory.Read(_reg.PC++);
+                    yield return false;
+
+                    _reg.W = Memory.Read(_reg.PC++);
+                    yield return false;
+
+                    _reg.PC = _reg.WZ;
+                    yield return false;
+                    break;
+                }
+
+                case Op.JpHL: {
+                    _reg.PC = _reg.HL;
+                    break;
+                }
+
+                case Op.JpCond: {
+                    _reg.Z = Memory.Read(_reg.PC++);
+                    yield return false;
+
+                    _reg.W = Memory.Read(_reg.PC++);
+                    yield return false;
+
+                    if (HasJumpCondition((Condition)instr.Src)) {
+                        _reg.PC = _reg.WZ;
+                        yield return false;
+                    }
+
+                    break;
+                }
+
+                case Op.Jr: {
+                    _reg.Z = Memory.Read(_reg.PC++);
+                    yield return false;
+
+                    _reg.WZ = (ushort)(_reg.PC + (sbyte)_reg.Z);
+                    yield return false;
+
+                    _reg.PC = _reg.WZ;
+                    break;
+                }
+
+                case Op.JrCond: {
+                    _reg.Z = Memory.Read(_reg.PC++);
+                    yield return false;
+
+                    if (HasJumpCondition((Condition)instr.Src)) {
+                        _reg.WZ = (ushort)(_reg.PC + (sbyte)_reg.Z);
+                        yield return false;
+
+                        _reg.PC = _reg.WZ;
+                    }
+
+                    break;
+                }
+
+                case Op.Call: {
+                    _reg.Z = Memory.Read(_reg.PC++);
+                    yield return false;
+
+                    _reg.W = Memory.Read(_reg.PC++);
+                    yield return false;
+
+                    _reg.SP--;
+                    yield return false;
+
+                    var (pch, pcl) = _reg.Split(Register16.PC);
+                    Memory.Write(_reg.SP--, pch);
+                    yield return false;
+
+                    Memory.Write(_reg.SP, pcl);
+                    _reg.PC = _reg.WZ;
+                    yield return false;
+
+                    break;
+                }
+
+                case Op.CallCond: {
+                    _reg.Z = Memory.Read(_reg.PC++);
+                    yield return false;
+
+                    _reg.W = Memory.Read(_reg.PC++);
+                    yield return false;
+
+                    if (HasJumpCondition((Condition)instr.Src)) {
+                        _reg.SP--;
+                        yield return false;
+
+                        var (pch, pcl) = _reg.Split(Register16.PC);
+                        Memory.Write(_reg.SP--, pch);
+                        yield return false;
+
+                        Memory.Write(_reg.SP, pcl);
+                        _reg.PC = _reg.WZ;
+                        yield return false;
+                    }
+
+                    break;
+                }
+
+                case Op.Ret: {
+                    _reg.Z = Memory.Read(_reg.SP++);
+                    yield return false;
+
+                    _reg.W = Memory.Read(_reg.SP++);
+                    yield return false;
+
+                    _reg.PC = _reg.WZ;
+                    yield return false;
+
+                    break;
+                }
+
+                case Op.RetCond: {
+                    var jump = HasJumpCondition((Condition)instr.Src);
+                    yield return false;
+
+                    if (jump) {
+                        _reg.Z = Memory.Read(_reg.SP++);
+                        yield return false;
+
+                        _reg.W = Memory.Read(_reg.SP++);
+                        yield return false;
+
+                        _reg.PC = _reg.WZ;
+                        yield return false;
+                    }
+
+                    break;
+                }
+
+                case Op.Reti: {
+                    _reg.Z = Memory.Read(_reg.SP++);
+                    yield return false;
+
+                    _reg.W = Memory.Read(_reg.SP++);
+                    yield return false;
+
+                    _reg.PC = _reg.WZ;
+                    _reg.IME = true;
+                    yield return false;
+
+                    break;
+                }
+
+                case Op.Rst: {
+                    _reg.SP--;
+                    yield return false;
+
+                    var (pch, pcl) = _reg.Split(Register16.PC);
+                    Memory.Write(_reg.SP--, pch);
+                    yield return false;
+
+                    Memory.Write(_reg.SP, pcl);
+                    _reg.PC = instr.Dst;
+                    yield return false;
+
+                    break;
+                }
+                #endregion
+
                 default: {
                     throw new UnreachableException(
                         $"Missing implementation for operation {instr.Op}"
@@ -981,9 +1144,16 @@ public sealed class Cpu
     private static byte Res(byte value, byte bit) => (byte)(value & ~(1 << bit));
 
     private static byte Set(byte value, byte bit) => (byte)(value | (1 << bit));
+
+    private bool HasJumpCondition(Condition condition) => condition switch {
+        Condition.NotZero  => !_reg.Flags.Z,
+        Condition.Zero     => _reg.Flags.Z,
+        Condition.NotCarry => !_reg.Flags.C,
+        Condition.Carry    => _reg.Flags.C,
+    };
 }
 
-file enum Op
+internal enum Op
 {
     NoOp,
     LoadReg8,
@@ -1075,9 +1245,29 @@ file enum Op
     ResHL,
     SetReg8,
     SetHL,
+
+    Jp,
+    JpHL,
+    JpCond,
+    Jr,
+    JrCond,
+    Call,
+    CallCond,
+    Ret,
+    RetCond,
+    Reti,
+    Rst,
 }
 
-file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Src = byte.MaxValue)
+internal enum Condition
+{
+    NotZero,
+    Zero,
+    NotCarry,
+    Carry,
+}
+
+internal readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Src = byte.MaxValue)
 {
     public static Instruction Decode(byte opcode)
     {
@@ -1089,8 +1279,10 @@ file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Sr
 
         return (x, z, y, q, p) switch {
             #region x == 0
-            (0, 0, 0, _, _) => new Instruction(Op.NoOp),
-            (0, 0, 1, _, _) => new Instruction(Op.LoadInd16SP),
+            (0, 0, 0,    _, _) => new Instruction(Op.NoOp),
+            (0, 0, 1,    _, _) => new Instruction(Op.LoadInd16SP),
+            (0, 0, 3,    _, _) => new Instruction(Op.Jr),
+            (0, 0, >= 4, _, _) => new Instruction(Op.JrCond, Src: ToCondition(y - 4)),
 
             (0, 1, _, 0, _) => new Instruction(Op.LoadImm16, Dst: ToReg16(p)),
             (0, 1, _, 1, _) => new Instruction(Op.AddHLReg16, Src: ToReg16(p)),
@@ -1158,22 +1350,31 @@ file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Sr
             #endregion
 
             #region x == 3
-            (3, 0, 4, _, _) => new Instruction(Op.LoadDirHighA),
-            (3, 0, 5, _, _) => new Instruction(Op.AddSPImm8),
-            (3, 0, 6, _, _) => new Instruction(Op.LoadADirHigh),
-            (3, 0, 7, _, _) => new Instruction(Op.LoadHLAdjustedSP),
+            (3, 0, <= 3, _, _) => new Instruction(Op.RetCond, Src: ToCondition(y)),
+            (3, 0, 4,    _, _) => new Instruction(Op.LoadDirHighA),
+            (3, 0, 5,    _, _) => new Instruction(Op.AddSPImm8),
+            (3, 0, 6,    _, _) => new Instruction(Op.LoadADirHigh),
+            (3, 0, 7,    _, _) => new Instruction(Op.LoadHLAdjustedSP),
 
             (3, 1, _, 0, _) => new Instruction(Op.Pop, Dst: ToReg16Stack(p)),
+            (3, 1, _, 1, 0) => new Instruction(Op.Ret),
+            (3, 1, _, 1, 1) => new Instruction(Op.Reti),
+            (3, 1, _, 1, 2) => new Instruction(Op.JpHL),
             (3, 1, _, 1, 3) => new Instruction(Op.LoadSPHL),
 
-            (3, 2, 4, _, _) => new Instruction(Op.LoadIndHighA),
-            (3, 2, 5, _, _) => new Instruction(Op.LoadDir16A),
-            (3, 2, 6, _, _) => new Instruction(Op.LoadAIndHigh),
-            (3, 2, 7, _, _) => new Instruction(Op.LoadADir16),
+            (3, 2, <= 3, _, _) => new Instruction(Op.JpCond, Src: ToCondition(y)),
+            (3, 2, 4,    _, _) => new Instruction(Op.LoadIndHighA),
+            (3, 2, 5,    _, _) => new Instruction(Op.LoadDir16A),
+            (3, 2, 6,    _, _) => new Instruction(Op.LoadAIndHigh),
+            (3, 2, 7,    _, _) => new Instruction(Op.LoadADir16),
 
+            (3, 3, 0, _, _) => new Instruction(Op.Jp),
             (3, 3, 1, _, _) => new Instruction(Op.CbPrefix),
 
+            (3, 4, <= 3, _, _) => new Instruction(Op.CallCond, Src: ToCondition(y)),
+
             (3, 5, _, 0, _) => new Instruction(Op.Push, Src: ToReg16Stack(p)),
+            (3, 5, _, 1, 0) => new Instruction(Op.Call),
 
             (3, 6, 0, _, _) => new Instruction(Op.AddImm8, Src: (byte)Register8.Z),
             (3, 6, 1, _, _) => new Instruction(Op.AdcImm8, Src: (byte)Register8.Z),
@@ -1183,6 +1384,8 @@ file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Sr
             (3, 6, 5, _, _) => new Instruction(Op.XorImm8, Src: (byte)Register8.Z),
             (3, 6, 6, _, _) => new Instruction(Op.OrImm8, Src: (byte)Register8.Z),
             (3, 6, 7, _, _) => new Instruction(Op.CpImm8, Src: (byte)Register8.Z),
+
+            (3, 7, _, _, _) => new Instruction(Op.Rst, Dst: (byte)(8 * y)),
             #endregion
 
             _ => throw new UnreachableException($"Missing decoder for opcode 0x{opcode:X2}"),
@@ -1261,5 +1464,14 @@ file readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byte Sr
             2 => (byte)Register16.HL,
             3 => (byte)Register16.AF,
             _ => throw new ArgumentException($"Not a Register16 placeholder: {placeholder}"),
+        };
+
+    private static byte ToCondition(int placeholder) =>
+        placeholder switch {
+            0 => (byte)Condition.NotZero,
+            1 => (byte)Condition.Zero,
+            2 => (byte)Condition.NotCarry,
+            3 => (byte)Condition.Carry,
+            _ => throw new ArgumentException($"Not a Condition placeholder: {placeholder}"),
         };
 }

@@ -92,14 +92,13 @@ public struct RegisterFile
     public ushort WZ { readonly get => this[Register16.WZ]; set => this[Register16.WZ] = value; }
 
     public byte IR { readonly get => this[Register8.IR]; set => this[Register8.IR] = value; }
-    public byte IME { readonly get => this[Register8.IME]; set => this[Register8.IME] = value; }
+    public bool IME { readonly get => this[Register8.IME] == 1; set => this[Register8.IME] = (byte)(value ? 1 : 0); }
 
     public ushort PC { readonly get => this[Register16.PC]; set => this[Register16.PC] = value; }
 
     public ushort SP { readonly get => this[Register16.SP]; set => this[Register16.SP] = value; }
 
     public readonly (byte Msb, byte Lsb) Split(Register16 register) =>
-        #pragma warning disable CS8524 // The switch expression does not handle some values of its input type (it is not exhaustive) involving an unnamed enum value.
         register switch {
             Register16.AF => (A, (byte)F),
             Register16.BC => (B, C),
@@ -109,7 +108,6 @@ public struct RegisterFile
             Register16.PC => (_storage[(int)Register16.PC + 1], _storage[(int)Register16.PC]),
             Register16.SP => (_storage[(int)Register16.SP + 1], _storage[(int)Register16.SP]),
         };
-        #pragma warning restore CS8524 // The switch expression does not handle some values of its input type (it is not exhaustive) involving an unnamed enum value.
 }
 
 public static class RegisterFileExtensions
