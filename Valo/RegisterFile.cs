@@ -38,7 +38,7 @@ public enum FlagsBit
     C = 0b0001_0000,
 }
 
-public struct RegisterFile
+public struct RegisterFile : IEquatable<RegisterFile>
 {
     [InlineArray((int)Register16.SP + 2)]
     private struct Storage
@@ -71,6 +71,7 @@ public struct RegisterFile
         }
     }
 
+    #region Register accessors
     public byte A { readonly get => this[Register8.A]; set => this[Register8.A] = value; }
     public FlagsBit F { readonly get => (FlagsBit)this[Register8.F]; set => this[Register8.F] = (byte)value; }
     public ushort AF { readonly get => this[Register16.AF]; set => this[Register16.AF] = value; }
@@ -97,6 +98,7 @@ public struct RegisterFile
     public ushort PC { readonly get => this[Register16.PC]; set => this[Register16.PC] = value; }
 
     public ushort SP { readonly get => this[Register16.SP]; set => this[Register16.SP] = value; }
+    #endregion Register accessors
 
     public readonly (byte Msb, byte Lsb) Split(Register16 register) =>
         register switch {
@@ -108,6 +110,37 @@ public struct RegisterFile
             Register16.PC => (_storage[(int)Register16.PC + 1], _storage[(int)Register16.PC]),
             Register16.SP => (_storage[(int)Register16.SP + 1], _storage[(int)Register16.SP]),
         };
+
+    public readonly bool Equals(RegisterFile other) =>
+        _storage[..].SequenceEqual(other._storage[..]);
+
+    public override readonly bool Equals(object? obj) =>
+        obj is RegisterFile other && Equals(other);
+
+    public override readonly int GetHashCode()
+    {
+        var hasher = new HashCode();
+        hasher.AddBytes(_storage);
+        return hasher.ToHashCode();
+    }
+
+    public static bool operator ==(RegisterFile left, RegisterFile right) => left.Equals(right);
+    public static bool operator !=(RegisterFile left, RegisterFile right) => !left.Equals(right);
+
+    public override readonly string ToString() =>
+        $$"""
+        Valo.RegisterFile {
+            {{nameof(A)}}: {{A}}, {{nameof(F)}}: {{F}},
+            {{nameof(B)}}: {{B}}, {{nameof(C)}}: {{C}},
+            {{nameof(D)}}: {{D}}, {{nameof(E)}}: {{E}},
+            {{nameof(H)}}: {{H}}, {{nameof(L)}}: {{L}},
+            {{nameof(W)}}: {{W}}, {{nameof(Z)}}: {{Z}},
+            {{nameof(IR)}}: {{IR}},
+            {{nameof(IME)}}: {{IME}},
+            {{nameof(PC)}}: {{PC}},
+            {{nameof(SP)}}: {{SP}},
+        }
+        """;
 }
 
 public static class RegisterFileExtensions
