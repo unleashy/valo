@@ -42,7 +42,31 @@ public sealed class Cpu
             var instr = Instruction.Decode(_reg.IR);
 
             switch (instr.Op) {
-                case Op.NoOp: break;
+                #region Management instructions
+                case Op.Nop: break;
+
+                case Op.Di: {
+                    _reg.IR = Memory.Read(_reg.PC++);
+                    _reg.IME = false;
+                    yield return true;
+                    continue;
+                }
+
+                case Op.Ei: {
+                    _reg.IR = Memory.Read(_reg.PC++);
+                    _reg.IME = true;
+                    yield return true;
+                    continue;
+                }
+
+                case Op.Halt: {
+                    throw new NotImplementedException();
+                }
+
+                case Op.Stop: {
+                    throw new NotSupportedException("STOP instruction is not supported");
+                }
+                #endregion Management instructions
 
                 #region 8-bit load instructions
                 case Op.LoadReg8: {
@@ -1155,7 +1179,12 @@ public sealed class Cpu
 
 internal enum Op
 {
-    NoOp,
+    Nop,
+    Halt,
+    Stop,
+    Di,
+    Ei,
+
     LoadReg8,
     LoadImm8,
     LoadReg8IndHL,
@@ -1279,8 +1308,9 @@ internal readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byt
 
         return (x, z, y, q, p) switch {
             #region x == 0
-            (0, 0, 0,    _, _) => new Instruction(Op.NoOp),
+            (0, 0, 0,    _, _) => new Instruction(Op.Nop),
             (0, 0, 1,    _, _) => new Instruction(Op.LoadInd16SP),
+            (0, 0, 2,    _, _) => new Instruction(Op.Stop),
             (0, 0, 3,    _, _) => new Instruction(Op.Jr),
             (0, 0, >= 4, _, _) => new Instruction(Op.JrCond, Src: ToCondition(y - 4)),
 
@@ -1318,6 +1348,7 @@ internal readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byt
             #endregion
 
             #region x == 1
+            (1, 6, 6, _, _) => new Instruction(Op.Halt),
             (1, _, 6, _, _) => new Instruction(Op.LoadIndHLReg8, Src: ToReg8(z)),
             (1, 6, _, _, _) => new Instruction(Op.LoadReg8IndHL, Dst: ToReg8(y)),
             (1, _, _, _, _) => new Instruction(Op.LoadReg8, Dst: ToReg8(y), Src: ToReg8(z)),
@@ -1370,6 +1401,8 @@ internal readonly record struct Instruction(Op Op, byte Dst = byte.MaxValue, byt
 
             (3, 3, 0, _, _) => new Instruction(Op.Jp),
             (3, 3, 1, _, _) => new Instruction(Op.CbPrefix),
+            (3, 3, 6, _, _) => new Instruction(Op.Di),
+            (3, 3, 7, _, _) => new Instruction(Op.Ei),
 
             (3, 4, <= 3, _, _) => new Instruction(Op.CallCond, Src: ToCondition(y)),
 
