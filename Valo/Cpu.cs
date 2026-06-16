@@ -542,7 +542,7 @@ public sealed class Cpu
 
                 case Op.Rrca: {
                     _reg.A = byte.RotateRight(_reg.A, 1);
-                    _reg.Flags.Replace((_reg.A >> 7) == 1 ? FlagsBit.C : 0);
+                    _reg.Flags.Replace(_reg.A >> 7 == 1 ? FlagsBit.C : 0);
                     break;
                 }
 
@@ -550,7 +550,7 @@ public sealed class Cpu
                     var before = _reg.A;
                     _reg.A <<= 1;
                     _reg.A = (byte)(_reg.Flags.C ? _reg.A | 1 : _reg.A & ~1);
-                    _reg.Flags.Replace((before >> 7) == 1 ? FlagsBit.C : 0);
+                    _reg.Flags.Replace(before >> 7 == 1 ? FlagsBit.C : 0);
                     break;
                 }
 
@@ -1060,7 +1060,7 @@ public sealed class Cpu
         var result = byte.RotateRight(value, 1);
 
         flags = 0;
-        if ((result >> 7) == 1) flags |= FlagsBit.C;
+        if (result >> 7 == 1) flags |= FlagsBit.C;
         if (result == 0) flags |= FlagsBit.Z;
 
         return result;
@@ -1069,10 +1069,10 @@ public sealed class Cpu
     private static byte Rl(byte value, bool carry, out FlagsBit flags)
     {
         var result = (byte)(value << 1);
-        result = (byte)(carry ? (result | 1) : (result & ~1));
+        result = (byte)(carry ? result | 1 : result & ~1);
 
         flags = 0;
-        if ((value >> 7) == 1) flags |= FlagsBit.C;
+        if (value >> 7 == 1) flags |= FlagsBit.C;
         if (result == 0) flags |= FlagsBit.Z;
 
         return result;
@@ -1081,7 +1081,7 @@ public sealed class Cpu
     private static byte Rr(byte value, bool carry, out FlagsBit flags)
     {
         var result = (byte)(value >> 1);
-        result = (byte)(carry ? (result | 0x80) : (result & ~0x80));
+        result = (byte)(carry ? result | 0x80 : result & ~0x80);
 
         flags = 0;
         if ((value & 1) == 1) flags |= FlagsBit.C;
@@ -1095,7 +1095,7 @@ public sealed class Cpu
         var result = (byte)(value << 1);
 
         flags = 0;
-        if ((value >> 7) == 1) flags |= FlagsBit.C;
+        if (value >> 7 == 1) flags |= FlagsBit.C;
         if (result == 0) flags |= FlagsBit.Z;
 
         return result;
