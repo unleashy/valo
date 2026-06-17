@@ -2,10 +2,16 @@
 
 namespace Valo;
 
+public enum CycleStatus
+{
+    Executing,
+    Fetched,
+}
+
 public sealed class Cpu
 {
     private RegisterFile _reg;
-    private readonly IEnumerator<bool> _executor;
+    private readonly IEnumerator<CycleStatus> _executor;
 
     public ref RegisterFile Registers => ref _reg;
     public IMemory Memory { get; }
@@ -20,17 +26,17 @@ public sealed class Cpu
     public int Step()
     {
         var cycleCount = 1;
-        while (!Cycle()) cycleCount++;
+        while (Cycle() == CycleStatus.Executing) cycleCount++;
         return cycleCount;
     }
 
-    public bool Cycle()
+    public CycleStatus Cycle()
     {
         _executor.MoveNext();
         return _executor.Current;
     }
 
-    private IEnumerator<bool> Executor()
+    private IEnumerator<CycleStatus> Executor()
     {
         // Technically, the first instruction executed by the CPU is a NOP (that falls through to
         // a generic fetch) but this would be annoying to work around in when using Step() right
@@ -48,14 +54,14 @@ public sealed class Cpu
                 case Op.Di: {
                     _reg.IR = Memory.Read(_reg.PC++);
                     _reg.IME = false;
-                    yield return true;
+                    yield return CycleStatus.Fetched;
                     continue;
                 }
 
                 case Op.Ei: {
                     _reg.IR = Memory.Read(_reg.PC++);
                     _reg.IME = true;
-                    yield return true;
+                    yield return CycleStatus.Fetched;
                     continue;
                 }
 
@@ -76,7 +82,7 @@ public sealed class Cpu
 
                 case Op.LoadImm8: {
                     _reg.Z = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg[(Register8)instr.Dst] = _reg.Z;
                     break;
@@ -84,7 +90,7 @@ public sealed class Cpu
 
                 case Op.LoadReg8IndHL: {
                     _reg.Z = Memory.Read(_reg.HL);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg[(Register8)instr.Dst] = _reg.Z;
                     break;
@@ -92,24 +98,24 @@ public sealed class Cpu
 
                 case Op.LoadIndHLReg8: {
                     Memory.Write(_reg.HL, _reg[(Register8)instr.Src]);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     break;
                 }
 
                 case Op.LoadIndHLImm8: {
                     _reg.Z = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     Memory.Write(_reg.HL, _reg.Z);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     break;
                 }
 
                 case Op.LoadAInd16: {
                     _reg.Z = Memory.Read(_reg[(Register16)instr.Src]);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg.A = _reg.Z;
                     break;
@@ -117,33 +123,33 @@ public sealed class Cpu
 
                 case Op.LoadInd16A: {
                     Memory.Write(_reg[(Register16)instr.Dst], _reg.A);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     break;
                 }
 
                 case Op.LoadDir16A: {
                     _reg.Z = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg.W = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     Memory.Write(_reg.WZ, _reg.A);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     break;
                 }
 
                 case Op.LoadADir16: {
                     _reg.Z = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg.W = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg.Z = Memory.Read(_reg.WZ);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg.A = _reg.Z;
                     break;
@@ -151,7 +157,7 @@ public sealed class Cpu
 
                 case Op.LoadAIndHigh: {
                     _reg.Z = Memory.Read((ushort)(0xFF00 | _reg.C));
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg.A = _reg.Z;
                     break;
@@ -159,17 +165,17 @@ public sealed class Cpu
 
                 case Op.LoadIndHighA: {
                     Memory.Write((ushort)(0xFF00 | _reg.C), _reg.A);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     break;
                 }
 
                 case Op.LoadADirHigh: {
                     _reg.Z = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg.Z = Memory.Read((ushort)(0xFF00 | _reg.Z));
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg.A = _reg.Z;
                     break;
@@ -177,16 +183,16 @@ public sealed class Cpu
 
                 case Op.LoadDirHighA: {
                     _reg.Z = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     Memory.Write((ushort)(0xFF00 | _reg.Z), _reg.A);
-                    yield return false;
+                    yield return CycleStatus.Executing;
                     break;
                 }
 
                 case Op.LoadAIncHL: {
                     _reg.Z = Memory.Read(_reg.HL++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg.A = _reg.Z;
                     break;
@@ -194,7 +200,7 @@ public sealed class Cpu
 
                 case Op.LoadADecHL: {
                     _reg.Z = Memory.Read(_reg.HL--);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg.A = _reg.Z;
                     break;
@@ -202,14 +208,14 @@ public sealed class Cpu
 
                 case Op.LoadIncHLA: {
                     Memory.Write(_reg.HL++, _reg.A);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     break;
                 }
 
                 case Op.LoadDecHLA: {
                     Memory.Write(_reg.HL--, _reg.A);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     break;
                 }
@@ -218,10 +224,10 @@ public sealed class Cpu
                 #region 16-bit load instructions
                 case Op.LoadImm16: {
                     _reg.Z = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg.W = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg[(Register16)instr.Dst] = _reg.WZ;
                     break;
@@ -229,31 +235,31 @@ public sealed class Cpu
 
                 case Op.LoadInd16SP: {
                     _reg.Z = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg.W = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     var (sph, spl) = _reg.Split(Register16.SP);
 
                     Memory.Write(_reg.WZ++, spl);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     Memory.Write(_reg.WZ, sph);
-                    yield return false;
+                    yield return CycleStatus.Executing;
                     break;
                 }
 
                 case Op.LoadHLAdjustedSP: {
                     _reg.Z = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     var (sph, spl) = _reg.Split(Register16.SP);
 
                     _reg.L = Add(spl, _reg.Z, out var flags);
                     _reg.Flags.Replace(flags);
                     _reg.Flags.Reset(FlagsBit.Z);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     var adj = _reg.Z > sbyte.MaxValue ? byte.MaxValue : 0;
                     _reg.H = (byte)(sph + adj + (_reg.Flags.C ? 1 : 0));
@@ -263,32 +269,32 @@ public sealed class Cpu
 
                 case Op.LoadSPHL: {
                     _reg.SP = _reg.HL;
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     break;
                 }
 
                 case Op.Push: {
                     _reg.SP--;
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     var (msb, lsb) = _reg.Split((Register16)instr.Src);
 
                     Memory.Write(_reg.SP--, msb);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     Memory.Write(_reg.SP, lsb);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     break;
                 }
 
                 case Op.Pop: {
                     _reg.Z = Memory.Read(_reg.SP++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg.W = Memory.Read(_reg.SP++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg[(Register16)instr.Dst] = _reg.WZ;
                     break;
@@ -298,14 +304,14 @@ public sealed class Cpu
                 #region 8-bit arithmetic instructions
                 case Op.AddHL: {
                     _reg[(Register8)instr.Src] = Memory.Read(_reg.HL);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     goto case Op.AddReg8;
                 }
 
                 case Op.AddImm8: {
                     _reg[(Register8)instr.Src] = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     goto case Op.AddReg8;
                 }
@@ -319,14 +325,14 @@ public sealed class Cpu
 
                 case Op.AdcHL: {
                     _reg[(Register8)instr.Src] = Memory.Read(_reg.HL);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     goto case Op.AdcReg8;
                 }
 
                 case Op.AdcImm8: {
                     _reg[(Register8)instr.Src] = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     goto case Op.AdcReg8;
                 }
@@ -346,14 +352,14 @@ public sealed class Cpu
 
                 case Op.SubHL: {
                     _reg[(Register8)instr.Src] = Memory.Read(_reg.HL);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     goto case Op.SubReg8;
                 }
 
                 case Op.SubImm8: {
                     _reg[(Register8)instr.Src] = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     goto case Op.SubReg8;
                 }
@@ -367,14 +373,14 @@ public sealed class Cpu
 
                 case Op.SbcHL: {
                     _reg[(Register8)instr.Src] = Memory.Read(_reg.HL);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     goto case Op.SbcReg8;
                 }
 
                 case Op.SbcImm8: {
                     _reg[(Register8)instr.Src] = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     goto case Op.SbcReg8;
                 }
@@ -393,14 +399,14 @@ public sealed class Cpu
 
                 case Op.CpHL: {
                     _reg[(Register8)instr.Src] = Memory.Read(_reg.HL);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     goto case Op.CpReg8;
                 }
 
                 case Op.CpImm8: {
                     _reg[(Register8)instr.Src] = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     goto case Op.CpReg8;
                 }
@@ -420,13 +426,13 @@ public sealed class Cpu
 
                 case Op.IncHL: {
                     _reg.Z = Memory.Read(_reg.HL);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     var result = Add(_reg.Z, 1, out var flags);
                     _reg.Flags.Apply(FlagsBit.Z | FlagsBit.N | FlagsBit.H, flags);
 
                     Memory.Write(_reg.HL, result);
-                    yield return false;
+                    yield return CycleStatus.Executing;
                     break;
                 }
 
@@ -439,13 +445,13 @@ public sealed class Cpu
 
                 case Op.DecHL: {
                     _reg.Z = Memory.Read(_reg.HL);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     var result = Sub(_reg.Z, 1, out var flags);
                     _reg.Flags.Apply(FlagsBit.Z | FlagsBit.N | FlagsBit.H, flags);
 
                     Memory.Write(_reg.HL, result);
-                    yield return false;
+                    yield return CycleStatus.Executing;
                     break;
                 }
 
@@ -500,14 +506,14 @@ public sealed class Cpu
                 #region 8-bit logical instructions
                 case Op.AndHL: {
                     _reg[(Register8)instr.Src] = Memory.Read(_reg.HL);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     goto case Op.AndReg8;
                 }
 
                 case Op.AndImm8: {
                     _reg[(Register8)instr.Src] = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     goto case Op.AndReg8;
                 }
@@ -520,14 +526,14 @@ public sealed class Cpu
 
                 case Op.OrHL: {
                     _reg[(Register8)instr.Src] = Memory.Read(_reg.HL);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     goto case Op.OrReg8;
                 }
 
                 case Op.OrImm8: {
                     _reg[(Register8)instr.Src] = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     goto case Op.OrReg8;
                 }
@@ -540,14 +546,14 @@ public sealed class Cpu
 
                 case Op.XorHL: {
                     _reg[(Register8)instr.Src] = Memory.Read(_reg.HL);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     goto case Op.XorReg8;
                 }
 
                 case Op.XorImm8: {
                     _reg[(Register8)instr.Src] = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     goto case Op.XorReg8;
                 }
@@ -601,7 +607,7 @@ public sealed class Cpu
 
                     _reg.L = Add(_reg.L, lsb, out var flags);
                     _reg.Flags.Apply(FlagsBit.N | FlagsBit.H | FlagsBit.C, flags);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg.H = Adc(_reg.H, msb, _reg.Flags.C, out flags);
                     _reg.Flags.Apply(FlagsBit.H | FlagsBit.C, flags);
@@ -612,14 +618,14 @@ public sealed class Cpu
 
                 case Op.IncReg16: {
                     ++_reg[(Register16)instr.Dst];
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     break;
                 }
 
                 case Op.DecReg16: {
                     --_reg[(Register16)instr.Dst];
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     break;
                 }
@@ -627,17 +633,17 @@ public sealed class Cpu
                 case Op.AddSPImm8: {
                     _reg.Z = Memory.Read(_reg.PC++);
                     var adj = _reg.Z > sbyte.MaxValue ? byte.MaxValue : 0;
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     var (sph, spl) = _reg.Split(Register16.SP);
 
                     _reg.Z = Add(spl, _reg.Z, out var flags);
                     _reg.Flags.Replace(flags);
                     _reg.Flags.Reset(FlagsBit.Z);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg.W = (byte)(sph + adj + (_reg.Flags.C ? 1 : 0));
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg.SP = _reg.WZ;
 
@@ -648,13 +654,13 @@ public sealed class Cpu
                 #region Control flow instructions
                 case Op.Jp: {
                     _reg.Z = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg.W = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg.PC = _reg.WZ;
-                    yield return false;
+                    yield return CycleStatus.Executing;
                     break;
                 }
 
@@ -665,14 +671,14 @@ public sealed class Cpu
 
                 case Op.JpCond: {
                     _reg.Z = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg.W = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     if (HasJumpCondition((Condition)instr.Src)) {
                         _reg.PC = _reg.WZ;
-                        yield return false;
+                        yield return CycleStatus.Executing;
                     }
 
                     break;
@@ -680,10 +686,10 @@ public sealed class Cpu
 
                 case Op.Jr: {
                     _reg.Z = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg.WZ = (ushort)(_reg.PC + (sbyte)_reg.Z);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg.PC = _reg.WZ;
                     break;
@@ -691,11 +697,11 @@ public sealed class Cpu
 
                 case Op.JrCond: {
                     _reg.Z = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     if (HasJumpCondition((Condition)instr.Src)) {
                         _reg.WZ = (ushort)(_reg.PC + (sbyte)_reg.Z);
-                        yield return false;
+                        yield return CycleStatus.Executing;
 
                         _reg.PC = _reg.WZ;
                     }
@@ -705,43 +711,43 @@ public sealed class Cpu
 
                 case Op.Call: {
                     _reg.Z = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg.W = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg.SP--;
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     var (pch, pcl) = _reg.Split(Register16.PC);
                     Memory.Write(_reg.SP--, pch);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     Memory.Write(_reg.SP, pcl);
                     _reg.PC = _reg.WZ;
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     break;
                 }
 
                 case Op.CallCond: {
                     _reg.Z = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg.W = Memory.Read(_reg.PC++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     if (HasJumpCondition((Condition)instr.Src)) {
                         _reg.SP--;
-                        yield return false;
+                        yield return CycleStatus.Executing;
 
                         var (pch, pcl) = _reg.Split(Register16.PC);
                         Memory.Write(_reg.SP--, pch);
-                        yield return false;
+                        yield return CycleStatus.Executing;
 
                         Memory.Write(_reg.SP, pcl);
                         _reg.PC = _reg.WZ;
-                        yield return false;
+                        yield return CycleStatus.Executing;
                     }
 
                     break;
@@ -749,30 +755,30 @@ public sealed class Cpu
 
                 case Op.Ret: {
                     _reg.Z = Memory.Read(_reg.SP++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg.W = Memory.Read(_reg.SP++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg.PC = _reg.WZ;
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     break;
                 }
 
                 case Op.RetCond: {
                     var jump = HasJumpCondition((Condition)instr.Src);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     if (jump) {
                         _reg.Z = Memory.Read(_reg.SP++);
-                        yield return false;
+                        yield return CycleStatus.Executing;
 
                         _reg.W = Memory.Read(_reg.SP++);
-                        yield return false;
+                        yield return CycleStatus.Executing;
 
                         _reg.PC = _reg.WZ;
-                        yield return false;
+                        yield return CycleStatus.Executing;
                     }
 
                     break;
@@ -780,29 +786,29 @@ public sealed class Cpu
 
                 case Op.Reti: {
                     _reg.Z = Memory.Read(_reg.SP++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg.W = Memory.Read(_reg.SP++);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     _reg.PC = _reg.WZ;
                     _reg.IME = true;
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     break;
                 }
 
                 case Op.Rst: {
                     _reg.SP--;
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     var (pch, pcl) = _reg.Split(Register16.PC);
                     Memory.Write(_reg.SP--, pch);
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     Memory.Write(_reg.SP, pcl);
                     _reg.PC = instr.Dst;
-                    yield return false;
+                    yield return CycleStatus.Executing;
 
                     break;
                 }
@@ -816,14 +822,14 @@ public sealed class Cpu
             }
 
             _reg.IR = Memory.Read(_reg.PC++);
-            yield return true;
+            yield return CycleStatus.Fetched;
         }
     }
 
-    private IEnumerable<bool> ExecuteCb()
+    private IEnumerable<CycleStatus> ExecuteCb()
     {
         _reg.IR = Memory.Read(_reg.PC++);
-        yield return false;
+        yield return CycleStatus.Executing;
 
         var instr = Instruction.DecodeCb(_reg.IR);
         switch (instr.Op) {
@@ -836,13 +842,13 @@ public sealed class Cpu
 
             case Op.RlcHL: {
                 _reg.Z = Memory.Read(_reg.HL);
-                yield return false;
+                yield return CycleStatus.Executing;
 
                 var result = Rlc(_reg.Z, out var flags);
                 _reg.Flags.Replace(flags);
 
                 Memory.Write(_reg.HL, result);
-                yield return false;
+                yield return CycleStatus.Executing;
                 break;
             }
 
@@ -855,13 +861,13 @@ public sealed class Cpu
 
             case Op.RrcHL: {
                 _reg.Z = Memory.Read(_reg.HL);
-                yield return false;
+                yield return CycleStatus.Executing;
 
                 var result = Rrc(_reg.Z, out var flags);
                 _reg.Flags.Replace(flags);
 
                 Memory.Write(_reg.HL, result);
-                yield return false;
+                yield return CycleStatus.Executing;
                 break;
             }
 
@@ -874,13 +880,13 @@ public sealed class Cpu
 
             case Op.RlHL: {
                 _reg.Z = Memory.Read(_reg.HL);
-                yield return false;
+                yield return CycleStatus.Executing;
 
                 var result = Rl(_reg.Z, _reg.Flags.C, out var flags);
                 _reg.Flags.Replace(flags);
 
                 Memory.Write(_reg.HL, result);
-                yield return false;
+                yield return CycleStatus.Executing;
                 break;
             }
 
@@ -893,13 +899,13 @@ public sealed class Cpu
 
             case Op.RrHL: {
                 _reg.Z = Memory.Read(_reg.HL);
-                yield return false;
+                yield return CycleStatus.Executing;
 
                 var result = Rr(_reg.Z, _reg.Flags.C, out var flags);
                 _reg.Flags.Replace(flags);
 
                 Memory.Write(_reg.HL, result);
-                yield return false;
+                yield return CycleStatus.Executing;
                 break;
             }
 
@@ -912,13 +918,13 @@ public sealed class Cpu
 
             case Op.SlaHL: {
                 _reg.Z = Memory.Read(_reg.HL);
-                yield return false;
+                yield return CycleStatus.Executing;
 
                 var result = Sla(_reg.Z, out var flags);
                 _reg.Flags.Replace(flags);
 
                 Memory.Write(_reg.HL, result);
-                yield return false;
+                yield return CycleStatus.Executing;
                 break;
             }
 
@@ -931,13 +937,13 @@ public sealed class Cpu
 
             case Op.SraHL: {
                 _reg.Z = Memory.Read(_reg.HL);
-                yield return false;
+                yield return CycleStatus.Executing;
 
                 var result = Sra(_reg.Z, out var flags);
                 _reg.Flags.Replace(flags);
 
                 Memory.Write(_reg.HL, result);
-                yield return false;
+                yield return CycleStatus.Executing;
                 break;
             }
 
@@ -950,13 +956,13 @@ public sealed class Cpu
 
             case Op.SrlHL: {
                 _reg.Z = Memory.Read(_reg.HL);
-                yield return false;
+                yield return CycleStatus.Executing;
 
                 var result = Srl(_reg.Z, out var flags);
                 _reg.Flags.Replace(flags);
 
                 Memory.Write(_reg.HL, result);
-                yield return false;
+                yield return CycleStatus.Executing;
                 break;
             }
 
@@ -969,13 +975,13 @@ public sealed class Cpu
 
             case Op.SwapHL: {
                 _reg.Z = Memory.Read(_reg.HL);
-                yield return false;
+                yield return CycleStatus.Executing;
 
                 var result = Swap(_reg.Z, out var flags);
                 _reg.Flags.Replace(flags);
 
                 Memory.Write(_reg.HL, result);
-                yield return false;
+                yield return CycleStatus.Executing;
                 break;
             }
 
@@ -988,7 +994,7 @@ public sealed class Cpu
 
             case Op.BitHL: {
                 _reg.Z = Memory.Read(_reg.HL);
-                yield return false;
+                yield return CycleStatus.Executing;
 
                 Bit(_reg.Z, instr.Dst);
                 break;
@@ -1002,12 +1008,12 @@ public sealed class Cpu
 
             case Op.ResHL: {
                 _reg.Z = Memory.Read(_reg.HL);
-                yield return false;
+                yield return CycleStatus.Executing;
 
                 var result = Res(_reg.Z, instr.Dst);
 
                 Memory.Write(_reg.HL, result);
-                yield return false;
+                yield return CycleStatus.Executing;
                 break;
             }
 
@@ -1019,12 +1025,12 @@ public sealed class Cpu
 
             case Op.SetHL: {
                 _reg.Z = Memory.Read(_reg.HL);
-                yield return false;
+                yield return CycleStatus.Executing;
 
                 var result = Set(_reg.Z, instr.Dst);
 
                 Memory.Write(_reg.HL, result);
-                yield return false;
+                yield return CycleStatus.Executing;
                 break;
             }
 
