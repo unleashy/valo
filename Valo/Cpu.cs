@@ -5,6 +5,7 @@ namespace Valo;
 public enum CycleStatus
 {
     Executing,
+    Servicing,
     Fetched,
 }
 
@@ -26,7 +27,7 @@ public sealed class Cpu
     public int Step()
     {
         var cycleCount = 1;
-        while (Cycle() == CycleStatus.Executing) cycleCount++;
+        while (Cycle() != CycleStatus.Fetched) cycleCount++;
         return cycleCount;
     }
 
@@ -822,6 +823,29 @@ public sealed class Cpu
             }
 
             _reg.IR = Memory.Read(_reg.PC++);
+
+            if (HasInterrupt()) {
+                yield return CycleStatus.Servicing;
+
+                --_reg.PC;
+                yield return CycleStatus.Servicing;
+
+                --_reg.SP;
+                yield return CycleStatus.Servicing;
+
+                var (pch, pcl) = _reg.Split(Register16.PC);
+                Memory.Write(_reg.SP--, pch);
+                yield return CycleStatus.Servicing;
+
+                Memory.Write(_reg.SP, pcl);
+
+                var vector = AcknowledgeInterrupt();
+                _reg.PC = vector;
+                yield return CycleStatus.Servicing;
+
+                _reg.IR = Memory.Read(_reg.PC++);
+            }
+
             yield return CycleStatus.Fetched;
         }
     }
@@ -1181,6 +1205,24 @@ public sealed class Cpu
         Condition.NotCarry => !_reg.Flags.C,
         Condition.Carry    => _reg.Flags.C,
     };
+
+    private bool HasInterrupt()
+    {
+        const ushort ie = 0xFFFF;
+        const ushort @if = 0xFF0F;
+
+        return _reg.IME && (Memory.Read(ie) & Memory.Read(@if)) != 0;
+    }
+
+    private ushort AcknowledgeInterrupt()
+    {
+        _reg.IME = false;
+        var requested = Memory.Read(0xFF0F);
+        Memory.Write(0xFF0F, (byte)(requested & (requested - 1)));
+
+        var which = byte.TrailingZeroCount(requested);
+        return (ushort)(0x40 + 8 * which);
+    }
 }
 
 internal enum Op

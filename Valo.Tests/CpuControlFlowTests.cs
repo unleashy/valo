@@ -265,6 +265,8 @@ public class CpuControlFlowTests : CpuTestsBase
                 .Map(0x1000, new Rom([0]))
                 .Map(0x5678, new Rom([opcode]))
                 .Map(0xA000, new Rom([0x00, 0x10]))
+                .Map(0xFF0F, new Rom([0]))
+                .Map(0xFFFF, new Rom([0]))
                 .Build()
         );
 

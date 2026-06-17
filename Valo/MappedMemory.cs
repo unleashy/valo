@@ -4,7 +4,7 @@ namespace Valo;
 
 public sealed partial class MappedMemory : IMemory
 {
-    private readonly record struct Allocation(ushort Start, ushort End, IMemory Memory);
+    private readonly record struct Allocation(uint Start, uint End, IMemory Memory);
 
     private readonly ImmutableArray<Allocation> _map;
 

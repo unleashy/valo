@@ -9,12 +9,12 @@ public partial class MappedMemory
         private ImmutableArray<Allocation>.Builder _map =
             ImmutableArray.CreateBuilder<Allocation>();
 
-        public Builder Map(ushort start, ISizedMemory memory)
+        public Builder Map(uint start, ISizedMemory memory)
         {
-            return Map(start, (ushort)(start + memory.Size), memory);
+            return Map(start, start + memory.Size, memory);
         }
 
-        public Builder Map(ushort start, ushort end, IMemory memory)
+        public Builder Map(uint start, uint end, IMemory memory)
         {
             if (start >= end) {
                 throw new ArgumentException(
@@ -38,7 +38,7 @@ public partial class MappedMemory
             return new MappedMemory(_map.DrainToImmutable());
         }
 
-        private bool HasAllocation(ushort start, ushort end) =>
+        private bool HasAllocation(uint start, uint end) =>
             _map.Any(it => start < it.End && it.Start < end);
     }
 }
