@@ -157,7 +157,7 @@ public sealed class Cpu
                 }
 
                 case Op.LoadAIndHigh: {
-                    _reg.Z = Memory.Read((ushort)(0xFF00 | _reg.C));
+                    _reg.Z = Memory.Read((ushort)(HighRam | _reg.C));
                     yield return CycleStatus.Executing;
 
                     _reg.A = _reg.Z;
@@ -165,7 +165,7 @@ public sealed class Cpu
                 }
 
                 case Op.LoadIndHighA: {
-                    Memory.Write((ushort)(0xFF00 | _reg.C), _reg.A);
+                    Memory.Write((ushort)(HighRam | _reg.C), _reg.A);
                     yield return CycleStatus.Executing;
 
                     break;
@@ -175,7 +175,7 @@ public sealed class Cpu
                     _reg.Z = Memory.Read(_reg.PC++);
                     yield return CycleStatus.Executing;
 
-                    _reg.Z = Memory.Read((ushort)(0xFF00 | _reg.Z));
+                    _reg.Z = Memory.Read((ushort)(HighRam | _reg.Z));
                     yield return CycleStatus.Executing;
 
                     _reg.A = _reg.Z;
@@ -186,7 +186,7 @@ public sealed class Cpu
                     _reg.Z = Memory.Read(_reg.PC++);
                     yield return CycleStatus.Executing;
 
-                    Memory.Write((ushort)(0xFF00 | _reg.Z), _reg.A);
+                    Memory.Write((ushort)(HighRam | _reg.Z), _reg.A);
                     yield return CycleStatus.Executing;
                     break;
                 }
@@ -1208,21 +1208,27 @@ public sealed class Cpu
 
     private bool HasInterrupt()
     {
-        const ushort ie = 0xFFFF;
-        const ushort @if = 0xFF0F;
-
-        return _reg.IME && (Memory.Read(ie) & Memory.Read(@if)) != 0;
+        return _reg.IME && (InterruptEnabled & InterruptFlags) != 0;
     }
 
     private ushort AcknowledgeInterrupt()
     {
         _reg.IME = false;
-        var requested = Memory.Read(0xFF0F);
-        Memory.Write(0xFF0F, (byte)(requested & (requested - 1)));
+        var requested = InterruptFlags;
+        InterruptFlags = (byte)(requested & (requested - 1));
 
         var which = byte.TrailingZeroCount(requested);
         return (ushort)(0x40 + 8 * which);
     }
+
+    private byte InterruptEnabled => Memory.Read(0xFFFF);
+
+    private byte InterruptFlags {
+        get => Memory.Read(0xFF0F);
+        set => Memory.Write(0xFF0F, value);
+    }
+
+    private const ushort HighRam = 0xFF00;
 }
 
 internal enum Op
