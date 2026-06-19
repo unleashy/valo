@@ -19,10 +19,22 @@ public class App : Application
     public override void OnFrameworkInitializationCompleted()
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop) {
-            desktop.MainWindow = new MainWindow { DataContext = new MainWindowViewModel(), };
+            desktop.MainWindow = CreateMainWindow();
             desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private static MainWindow CreateMainWindow()
+    {
+        var window = new MainWindow();
+
+        window.DataContext = new MainWindowViewModel(
+            window.StorageProvider,
+            new GameBoyService()
+        );
+
+        return window;
     }
 }

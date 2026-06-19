@@ -1,8 +1,7 @@
-using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Valo.App.ViewModels;
 
 namespace Valo.App.Views;
 
@@ -10,6 +9,13 @@ public partial class MainWindow : Window
 {
     public MainWindow()
     {
+        if (Design.IsDesignMode) {
+            Design.SetDataContext(
+                this,
+                new MainWindowViewModel(StorageProvider, new GameBoyService())
+            );
+        }
+
         InitializeComponent();
     }
 

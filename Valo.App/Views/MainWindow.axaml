@@ -19,14 +19,10 @@
 
   KeyDown="InputElement_OnKeyDown"
 >
-  <Design.DataContext>
-    <vm:MainWindowViewModel />
-  </Design.DataContext>
-
   <DockPanel>
     <Menu DockPanel.Dock="Top">
       <MenuItem Header="{x:Static l:Resources.Menu_File}">
-        <MenuItem Header="{x:Static l:Resources.Menu_Open}" />
+        <MenuItem Header="{x:Static l:Resources.Menu_Open}" Command="{Binding OpenFile}" />
         <Separator />
         <MenuItem Header="{x:Static l:Resources.Menu_Exit}" Click="ExitOnClick" />
       </MenuItem>
