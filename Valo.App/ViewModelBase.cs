@@ -1,5 +1,5 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 
-namespace Valo.App.ViewModels;
+namespace Valo.App;
 
 public abstract class ViewModelBase : ObservableObject {}

@@ -4,9 +4,6 @@ using Avalonia.Controls.ApplicationLifetimes;
 
 using Avalonia.Markup.Xaml;
 
-using Valo.App.ViewModels;
-using Valo.App.Views;
-
 namespace Valo.App;
 
 public class App : Application

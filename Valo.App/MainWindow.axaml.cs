@@ -1,9 +1,8 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using Valo.App.ViewModels;
 
-namespace Valo.App.Views;
+namespace Valo.App;
 
 public partial class MainWindow : Window
 {

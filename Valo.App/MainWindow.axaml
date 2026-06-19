@@ -1,14 +1,13 @@
 <Window
   xmlns="https://github.com/avaloniaui"
   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-  xmlns:vm="using:Valo.App.ViewModels"
   xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
   xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
   xmlns:l="clr-namespace:Valo.App.Lang"
   xmlns:valo="clr-namespace:Valo.App"
   mc:Ignorable="d"
-  x:Class="Valo.App.Views.MainWindow"
-  x:DataType="vm:MainWindowViewModel"
+  x:Class="Valo.App.MainWindow"
+  x:DataType="valo:MainWindowViewModel"
 
   Title="{x:Static l:Resources.AppTitle}"
   Width="320"

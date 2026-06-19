@@ -1,7 +1,7 @@
 ﻿using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.Input;
 
-namespace Valo.App.ViewModels;
+namespace Valo.App;
 
 public partial class MainWindowViewModel(
     IStorageProvider storage,
