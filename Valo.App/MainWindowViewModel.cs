@@ -28,5 +28,6 @@ public partial class MainWindowViewModel(
         await stream.CopyToAsync(contents);
 
         gameBoyService.LoadCartridge(contents.GetBuffer());
+        await gameBoyService.RunAsync();
     }
 }
