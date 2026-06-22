@@ -30,7 +30,7 @@ public enum Register16
 }
 
 [Flags]
-public enum FlagsBit
+public enum FlagsBit : byte
 {
     Z = 0b1000_0000,
     N = 0b0100_0000,
