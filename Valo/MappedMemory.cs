@@ -2,16 +2,10 @@
 
 namespace Valo;
 
-public sealed partial class MappedMemory : IMemory
+public sealed partial class MappedMemory(ImmutableArray<LocatedMemory> map) : IMemory
 {
-    private readonly record struct Allocation(uint Start, uint End, IMemory Memory);
-
-    private readonly ImmutableArray<Allocation> _map;
-
-    private MappedMemory(ImmutableArray<Allocation> map)
-    {
-        _map = map;
-    }
+    private readonly ImmutableArray<LocatedMemory> _map =
+        map.Sort((a, b) => (int)(a.Start - b.Start));
 
     public byte Read(ushort address)
     {
@@ -27,10 +21,25 @@ public sealed partial class MappedMemory : IMemory
 
     private (IMemory, ushort offset) Map(ushort address)
     {
-        foreach (var alloc in _map) {
-            if (alloc.Start <= address && address < alloc.End) {
-                return (alloc.Memory, (ushort)(address - alloc.Start));
+        if (_map.Length == 0) throw new UnmappedMemoryException(address);
+
+        var len = _map.Length;
+        var pivot = 0;
+
+        while (len > 1) {
+            var half = len / 2;
+            var mid = pivot + half;
+
+            if (_map[mid].Start <= address) {
+                pivot = mid;
             }
+
+            len -= half;
+        }
+
+        var match = _map[pivot];
+        if (match.Start <= address && address < match.End) {
+            return (match.Memory, (ushort)(address - match.Start));
         }
 
         throw new UnmappedMemoryException(address);
