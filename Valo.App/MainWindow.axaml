@@ -21,7 +21,7 @@
   <DockPanel>
     <Menu DockPanel.Dock="Top">
       <MenuItem Header="{x:Static l:Resources.Menu_File}">
-        <MenuItem Header="{x:Static l:Resources.Menu_Open}" Command="{Binding OpenFile}" />
+        <MenuItem Header="{x:Static l:Resources.Menu_Open}" Command="{Binding OpenFileCommand}" />
         <Separator />
         <MenuItem Header="{x:Static l:Resources.Menu_Exit}" Click="ExitOnClick" />
       </MenuItem>
