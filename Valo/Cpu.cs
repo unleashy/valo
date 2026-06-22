@@ -15,7 +15,7 @@ public sealed class Cpu
     private readonly IEnumerator<CycleStatus> _executor;
 
     public ref RegisterFile Registers => ref _reg;
-    public IMemory Memory { get; }
+    public IMemory Memory { get; set; }
 
     public Cpu(RegisterFile registers, IMemory memory)
     {
