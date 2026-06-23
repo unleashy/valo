@@ -32,7 +32,7 @@ public class CpuManagementTests : CpuTestsBase
         var cycles = sut.Step();
 
         Assert.Multiple(() => {
-            Assert.That(sut.Registers.IME, Is.True);
+            Assert.That(sut.Interrupts.MasterEnabled, Is.True);
             Assert.That(cycles, Is.EqualTo(1));
         });
     }
@@ -42,14 +42,15 @@ public class CpuManagementTests : CpuTestsBase
     {
         byte opcode = 0b11110011;
         var sut = new Cpu(
-            new RegisterFile { IME = true },
-            new Rom([opcode, 0])
+            new RegisterFile(),
+            new Rom([opcode, 0]),
+            new InterruptController { MasterEnabled = true }
         );
 
         var cycles = sut.Step();
 
         Assert.Multiple(() => {
-            Assert.That(sut.Registers.IME, Is.False);
+            Assert.That(sut.Interrupts.MasterEnabled, Is.False);
             Assert.That(cycles, Is.EqualTo(1));
         });
     }

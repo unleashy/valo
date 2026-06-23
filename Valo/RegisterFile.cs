@@ -30,7 +30,7 @@ public enum Register16
 }
 
 [Flags]
-public enum FlagsBit : byte
+public enum FlagsBit
 {
     Z = 0b1000_0000,
     N = 0b0100_0000,
@@ -93,7 +93,6 @@ public struct RegisterFile : IEquatable<RegisterFile>
     public ushort WZ { readonly get => this[Register16.WZ]; set => this[Register16.WZ] = value; }
 
     public byte IR { readonly get => this[Register8.IR]; set => this[Register8.IR] = value; }
-    public bool IME { readonly get => this[Register8.IME] == 1; set => this[Register8.IME] = (byte)(value ? 1 : 0); }
 
     public ushort PC { readonly get => this[Register16.PC]; set => this[Register16.PC] = value; }
 
@@ -136,7 +135,6 @@ public struct RegisterFile : IEquatable<RegisterFile>
             {{nameof(H)}}: {{H}}, {{nameof(L)}}: {{L}},
             {{nameof(W)}}: {{W}}, {{nameof(Z)}}: {{Z}},
             {{nameof(IR)}}: {{IR}},
-            {{nameof(IME)}}: {{IME}},
             {{nameof(PC)}}: {{PC}},
             {{nameof(SP)}}: {{SP}},
         }

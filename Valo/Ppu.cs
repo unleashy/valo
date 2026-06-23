@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 
 namespace Valo;
 
-public sealed class Ppu(ILcd lcd, IMemory vram, IMemory oam)
+public sealed class Ppu(ILcd lcd, IMemory vram, IMemory oam, InterruptRequester interrupt)
 {
     public PpuControl Control { get; set; }
     public PpuInterrupts Interrupts { get; set; }
@@ -43,6 +43,7 @@ public sealed class Ppu(ILcd lcd, IMemory vram, IMemory oam)
             };
 
             UpdateLocations();
+            RequestInterruptsIfNeeded();
         }
         else {
             Reset();
@@ -95,6 +96,16 @@ public sealed class Ppu(ILcd lcd, IMemory vram, IMemory oam)
         if (CurrentLine >= MaxLine) {
             CurrentLine = 0;
         }
+    }
+
+    private void RequestInterruptsIfNeeded()
+    {
+        interrupt.RequestIf(
+            Interrupts.HasFlag(PpuInterrupts.IntLyc)   && IsLineOnTarget ||
+            Interrupts.HasFlag(PpuInterrupts.IntMode2) && Mode == PpuMode.OamRead ||
+            Interrupts.HasFlag(PpuInterrupts.IntMode1) && Mode == PpuMode.VBlank ||
+            Interrupts.HasFlag(PpuInterrupts.IntMode0) && Mode == PpuMode.HBlank
+        );
     }
 
     public IEnumerable<LocatedMemory> MemoryLayout() => [

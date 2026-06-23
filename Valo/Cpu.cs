@@ -16,11 +16,22 @@ public sealed class Cpu
 
     public ref RegisterFile Registers => ref _reg;
     public IMemory Memory { get; set; }
+    public InterruptController Interrupts { get; }
 
     public Cpu(RegisterFile registers, IMemory memory)
+        : this(registers, memory, new InterruptController())
+    {}
+
+    public Cpu(
+        RegisterFile registers,
+        IMemory memory,
+        InterruptController interrupts
+    )
     {
         _reg = registers;
         Memory = memory;
+        Interrupts = interrupts;
+
         _executor = Executor();
     }
 
@@ -54,14 +65,14 @@ public sealed class Cpu
 
                 case Op.Di: {
                     _reg.IR = Memory.Read(_reg.PC++);
-                    _reg.IME = false;
+                    Interrupts.MasterEnabled = false;
                     yield return CycleStatus.Fetched;
                     continue;
                 }
 
                 case Op.Ei: {
                     _reg.IR = Memory.Read(_reg.PC++);
-                    _reg.IME = true;
+                    Interrupts.MasterEnabled = true;
                     yield return CycleStatus.Fetched;
                     continue;
                 }
@@ -793,7 +804,7 @@ public sealed class Cpu
                     yield return CycleStatus.Executing;
 
                     _reg.PC = _reg.WZ;
-                    _reg.IME = true;
+                    Interrupts.MasterEnabled = true;
                     yield return CycleStatus.Executing;
 
                     break;
@@ -824,7 +835,7 @@ public sealed class Cpu
 
             _reg.IR = Memory.Read(_reg.PC++);
 
-            if (HasInterrupt()) {
+            if (Interrupts.TryAcknowledge(out var vector)) {
                 yield return CycleStatus.Servicing;
 
                 --_reg.PC;
@@ -839,7 +850,6 @@ public sealed class Cpu
 
                 Memory.Write(_reg.SP, pcl);
 
-                var vector = AcknowledgeInterrupt();
                 _reg.PC = vector;
                 yield return CycleStatus.Servicing;
 
@@ -1205,28 +1215,6 @@ public sealed class Cpu
         Condition.NotCarry => !_reg.Flags.C,
         Condition.Carry    => _reg.Flags.C,
     };
-
-    private bool HasInterrupt()
-    {
-        return _reg.IME && (InterruptEnabled & InterruptFlags) != 0;
-    }
-
-    private ushort AcknowledgeInterrupt()
-    {
-        _reg.IME = false;
-        var requested = InterruptFlags;
-        InterruptFlags = (byte)(requested & (requested - 1));
-
-        var which = byte.TrailingZeroCount(requested);
-        return (ushort)(0x40 + 8 * which);
-    }
-
-    private byte InterruptEnabled => Memory.Read(0xFFFF);
-
-    private byte InterruptFlags {
-        get => Memory.Read(0xFF0F);
-        set => Memory.Write(0xFF0F, value);
-    }
 
     private const ushort HighRam = 0xFF00;
 }

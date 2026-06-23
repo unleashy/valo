@@ -275,7 +275,7 @@ public class CpuControlFlowTests : CpuTestsBase
         Assert.Multiple(() => {
             Assert.That(sut.Registers.PC, Is.EqualTo(0x1001));
             Assert.That(sut.Registers.SP, Is.EqualTo(0xA002));
-            Assert.That(sut.Registers.IME, Is.True);
+            Assert.That(sut.Interrupts.MasterEnabled, Is.True);
             Assert.That(cycles, Is.EqualTo(4));
         });
     }
