@@ -1,4 +1,5 @@
 ﻿using System.Drawing;
+using System.Runtime.CompilerServices;
 
 namespace Valo;
 
@@ -13,6 +14,10 @@ public sealed class Ppu(ILcd lcd, IMemory vram, IMemory oam)
     public bool IsLineOnTarget => CurrentLine == LineTarget;
 
     public Point ViewportPos { get; set; }
+
+    public Palette BgPalette { get; set; }
+    public Palette Obj0Palette { get; set; }
+    public Palette Obj1Palette { get; set; }
 
     private const uint MaxDot = 456;
     private const uint MaxOamReadDot = 80;
@@ -111,6 +116,17 @@ public sealed class Ppu(ILcd lcd, IMemory vram, IMemory oam)
         ),
         AccessorMemory.Located(0xFF44, () => CurrentLine, _ => {}),
         AccessorMemory.Located(0xFF45, () => LineTarget, it => LineTarget = it),
+        AccessorMemory.Located(0xFF47, BgPalette.ToByte, it => BgPalette = Palette.FromByte(it)),
+        AccessorMemory.Located(
+            0xFF48,
+            Obj0Palette.ToByte,
+            it => Obj0Palette = Palette.FromByte(it)
+        ),
+        AccessorMemory.Located(
+            0xFF49,
+            Obj1Palette.ToByte,
+            it => Obj1Palette = Palette.FromByte(it)
+        ),
     ];
 }
 
@@ -142,4 +158,30 @@ public enum PpuMode : byte
     VBlank  = 1,
     OamRead = 2,
     Render  = 3,
+}
+
+[InlineArray(4)]
+public struct Palette
+{
+    private Shade _slot;
+
+    public static Palette FromByte(byte code)
+    {
+        var palette = new Palette();
+
+        palette[0] = (Shade)(code >> 0 & 0b11);
+        palette[1] = (Shade)(code >> 2 & 0b11);
+        palette[2] = (Shade)(code >> 4 & 0b11);
+        palette[3] = (Shade)(code >> 6 & 0b11);
+
+        return palette;
+    }
+
+    public byte ToByte() =>
+        (byte)(
+            (byte)this[0] << 0 |
+            (byte)this[1] << 2 |
+            (byte)this[2] << 4 |
+            (byte)this[3] << 6
+        );
 }
