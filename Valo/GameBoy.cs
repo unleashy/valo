@@ -26,6 +26,8 @@ public sealed class GameBoy(Cpu cpu, Ppu ppu)
             .Map(cartridge.MemoryLayout())
             .Map(ppu.MemoryLayout())
             .Map(interrupts.MemoryLayout())
+            // temporary: APU not implemented yet
+            .Map(0xFF10, 0xFF27, new OpenBusMemory())
             .Build();
 
         var cpu = new Cpu(new RegisterFile(), memory, interrupts);
