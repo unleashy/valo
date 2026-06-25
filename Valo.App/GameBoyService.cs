@@ -4,14 +4,13 @@ using System.Runtime.InteropServices;
 
 namespace Valo.App;
 
-public sealed class GameBoyService
+public sealed class GameBoyService(ILcd lcd)
 {
     private GameBoy? _gameBoy;
-    private WritableBitmapLcd _bitmap = new();
 
     public void LoadCartridge(ReadOnlySpan<byte> cartridgeData)
     {
-        _gameBoy = GameBoy.Create(Cartridge.FromBytes(cartridgeData), _bitmap);
+        _gameBoy = GameBoy.Create(Cartridge.FromBytes(cartridgeData), lcd);
     }
 
     public async Task RunAsync(CancellationToken ct = default)

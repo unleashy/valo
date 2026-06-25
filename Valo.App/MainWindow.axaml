@@ -11,7 +11,7 @@
 
   Title="{x:Static l:Resources.AppTitle}"
   Width="320"
-  Height="240"
+  Height="288"
   MinWidth="160"
   MinHeight="144"
   WindowStartupLocation="CenterScreen"
@@ -19,7 +19,7 @@
   KeyDown="InputElement_OnKeyDown"
 >
   <DockPanel>
-    <Menu DockPanel.Dock="Top">
+    <Menu DockPanel.Dock="Top" Name="Menu">
       <MenuItem Header="{x:Static l:Resources.Menu_File}">
         <MenuItem Header="{x:Static l:Resources.Menu_Open}" Command="{Binding OpenFileCommand}" />
         <Separator />
@@ -27,6 +27,12 @@
       </MenuItem>
     </Menu>
 
-    <valo:GameScreen Name="GameScreen" Focusable="True" />
+    <valo:GameScreen
+      Name="GameScreen"
+      Focusable="True"
+      Source="{Binding Lcd}"
+      MinWidth="160"
+      MinHeight="144"
+    />
   </DockPanel>
 </Window>

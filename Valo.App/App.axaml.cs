@@ -26,10 +26,7 @@ public class App : Application
     {
         var window = new MainWindow(args ?? []);
 
-        window.DataContext = new MainWindowViewModel(
-            window.StorageProvider,
-            new GameBoyService()
-        );
+        window.DataContext = new MainWindowViewModel(window.StorageProvider);
 
         return window;
     }

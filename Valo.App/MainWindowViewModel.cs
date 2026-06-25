@@ -3,16 +3,24 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace Valo.App;
 
-public partial class MainWindowViewModel(
-    IStorageProvider storage,
-    GameBoyService gameBoyService
-) : ViewModelBase
+public partial class MainWindowViewModel : ViewModelBase
 {
+    private readonly IStorageProvider _storage;
+    private readonly GameBoyService _gameBoyService;
+
+    public AvaloniaLcd Lcd { get; } = new();
+
+    public MainWindowViewModel(IStorageProvider storage)
+    {
+        _storage = storage;
+        _gameBoyService = new GameBoyService(Lcd);
+    }
+
     [RelayCommand]
     public async Task OpenFile()
     {
         var fileType = new FilePickerFileType("Game Boy ROM") { Patterns = ["*.gb"] };
-        var files = await storage.OpenFilePickerAsync(new FilePickerOpenOptions {
+        var files = await _storage.OpenFilePickerAsync(new FilePickerOpenOptions {
             Title = "Open Game Boy ROM",
             AllowMultiple = false,
             FileTypeFilter = [fileType, FilePickerFileTypes.All],
@@ -25,10 +33,11 @@ public partial class MainWindowViewModel(
         await LoadCartridge(file);
     }
 
+    [RelayCommand]
     public async Task LoadFile(string path)
     {
         using var file =
-            await storage.TryGetFileFromPathAsync(new Uri(path)) ??
+            await _storage.TryGetFileFromPathAsync(new Uri(path)) ??
             throw new FileNotFoundException("File not found", path);
 
         await LoadCartridge(file);
@@ -41,7 +50,7 @@ public partial class MainWindowViewModel(
         using var contents = new MemoryStream();
         await stream.CopyToAsync(contents);
 
-        gameBoyService.LoadCartridge(contents.GetBuffer());
-        await gameBoyService.RunAsync();
+        _gameBoyService.LoadCartridge(contents.GetBuffer());
+        await _gameBoyService.RunAsync();
     }
 }

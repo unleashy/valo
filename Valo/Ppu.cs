@@ -35,6 +35,7 @@ public sealed class Ppu(ILcd lcd, IMemory vram, IMemory oam, InterruptRequester 
                 Mode = PpuMode.OamRead;
             }
 
+            var prevMode = Mode;
             Mode = Mode switch {
                 PpuMode.OamRead => CycleOamRead(),
                 PpuMode.Render  => CycleRender(),
@@ -43,7 +44,8 @@ public sealed class Ppu(ILcd lcd, IMemory vram, IMemory oam, InterruptRequester 
             };
 
             UpdateLocations();
-            RequestInterruptsIfNeeded();
+            RequestInterruptsIfNeeded(prevMode);
+            FireVBlankIfNeeded(prevMode);
         }
         else {
             Reset();
@@ -57,6 +59,16 @@ public sealed class Ppu(ILcd lcd, IMemory vram, IMemory oam, InterruptRequester 
 
     private PpuMode CycleRender()
     {
+        for (var x = 0; x < ILcd.Width; ++x) {
+            lcd.Poke(new Point(x, 0), Shade.Black);
+            lcd.Poke(new Point(x, ILcd.Height - 1), Shade.Black);
+        }
+
+        for (var y = 0; y < ILcd.Height; ++y) {
+            lcd.Poke(new Point(0, y), Shade.Black);
+            lcd.Poke(new Point(ILcd.Width - 1, y), Shade.Black);
+        }
+
         return _currentDot < MinRenderDot ? PpuMode.Render : PpuMode.HBlank;
     }
 
@@ -98,14 +110,24 @@ public sealed class Ppu(ILcd lcd, IMemory vram, IMemory oam, InterruptRequester 
         }
     }
 
-    private void RequestInterruptsIfNeeded()
+    private void RequestInterruptsIfNeeded(PpuMode prevMode)
     {
-        interrupt.RequestIf(
-            Interrupts.HasFlag(PpuInterrupts.IntLyc)   && IsLineOnTarget ||
-            Interrupts.HasFlag(PpuInterrupts.IntMode2) && Mode == PpuMode.OamRead ||
-            Interrupts.HasFlag(PpuInterrupts.IntMode1) && Mode == PpuMode.VBlank ||
-            Interrupts.HasFlag(PpuInterrupts.IntMode0) && Mode == PpuMode.HBlank
-        );
+        var lyc = Interrupts.HasFlag(PpuInterrupts.IntLyc) && IsLineOnTarget;
+
+        var modeChange =
+            prevMode != Mode &&
+            (Interrupts.HasFlag(PpuInterrupts.IntMode2) && Mode == PpuMode.OamRead ||
+             Interrupts.HasFlag(PpuInterrupts.IntMode1) && Mode == PpuMode.VBlank ||
+             Interrupts.HasFlag(PpuInterrupts.IntMode0) && Mode == PpuMode.HBlank);
+
+        interrupt.RequestIf(lyc || modeChange);
+    }
+
+    private void FireVBlankIfNeeded(PpuMode prevMode)
+    {
+        if (prevMode != PpuMode.VBlank && Mode == PpuMode.VBlank) {
+            lcd.OnVBlank();
+        }
     }
 
     public IEnumerable<LocatedMemory> MemoryLayout() => [

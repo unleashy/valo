@@ -15,22 +15,23 @@ public partial class MainWindow : Window
         if (Design.IsDesignMode) {
             Design.SetDataContext(
                 this,
-                new MainWindowViewModel(StorageProvider, new GameBoyService())
+                new MainWindowViewModel(StorageProvider)
             );
         }
 
         InitializeComponent();
     }
 
-    protected override async void OnLoaded(RoutedEventArgs e)
+    protected override void OnLoaded(RoutedEventArgs e)
     {
         base.OnLoaded(e);
 
-        GameScreen.Focus();
-
         if (_args.Length >= 1 && DataContext is MainWindowViewModel vm) {
-            await vm.LoadFile(_args[0]);
+            vm.LoadFileCommand.Execute(_args[0]);
         }
+
+        MinHeight += Menu.Bounds.Height;
+        GameScreen.Focus();
     }
 
     public void ExitOnClick(object? sender, RoutedEventArgs routedEventArgs)

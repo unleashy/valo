@@ -8,6 +8,7 @@ public interface ILcd
     public const int Height = 144;
 
     public void Poke(Point pixel, Shade shade);
+    public void OnVBlank();
 }
 
 public enum Shade
