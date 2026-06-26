@@ -78,7 +78,8 @@ public sealed class Cpu
                 }
 
                 case Op.Halt: {
-                    throw new NotImplementedException();
+                    _reg.PC--;
+                    break;
                 }
 
                 case Op.Stop: {

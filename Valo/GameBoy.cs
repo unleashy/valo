@@ -1,4 +1,6 @@
-﻿namespace Valo;
+﻿using System.Diagnostics;
+
+namespace Valo;
 
 public sealed class GameBoy(Cpu cpu, Ppu ppu)
 {
@@ -8,6 +10,8 @@ public sealed class GameBoy(Cpu cpu, Ppu ppu)
     public const double MsPerFrame = (double)TcyclesPerFrame / ClockHz * 1000;
 
     private ulong _tCycles;
+    private ulong _prevTcycles;
+    private ulong _cpuLag;
 
     public static GameBoy Create(Cartridge cartridge, ILcd lcd)
     {
@@ -45,18 +49,18 @@ public sealed class GameBoy(Cpu cpu, Ppu ppu)
     {
         var endCycles = _tCycles + maxCycles;
         while (_tCycles < endCycles) {
-            Cycle();
+            var elapsed = _tCycles - _prevTcycles;
+            _prevTcycles = _tCycles;
+            _cpuLag += elapsed;
+
+            while (_cpuLag >= McyclesPerTcycles) {
+                cpu.Cycle();
+                _cpuLag -= McyclesPerTcycles;
+            }
+
+            var ppuCycles = ppu.Step();
+            Debug.Assert(ppuCycles > 0);
+            _tCycles += ppuCycles;
         }
-    }
-
-    private void Cycle()
-    {
-        if (_tCycles % McyclesPerTcycles == 0) {
-            cpu.Cycle();
-        }
-
-        ppu.Cycle();
-
-        ++_tCycles;
     }
 }

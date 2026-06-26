@@ -29,7 +29,7 @@ public class BootMemory : IMemory
             }
 
             case BootRomFlag: {
-                return 1;
+                return 0;
             }
 
             default: {
@@ -46,7 +46,7 @@ public class BootMemory : IMemory
                 return;
             }
 
-            case BootRomFlag when value == 0: {
+            case BootRomFlag when value == 1: {
                 _underlyingCpu.Memory = _underlyingMemory;
                 return;
             }

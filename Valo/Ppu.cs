@@ -1,133 +1,257 @@
-﻿using System.Drawing;
+﻿using System.Diagnostics;
+using System.Drawing;
 using System.Runtime.CompilerServices;
 
 namespace Valo;
 
 public sealed class Ppu(ILcd lcd, IMemory vram, IMemory oam, InterruptRequester interrupt)
 {
+    public ILcd Lcd { get; } = lcd;
+    public IMemory Vram { get; } = vram;
+    public IMemory Oam { get; } = oam;
+
+    private PpuMode _mode = PpuMode.OamRead;
+    public PpuMode Mode {
+        get => _mode;
+        set {
+            var prev = _mode;
+            _mode = value;
+
+            interrupt.RequestIf(
+                _mode != prev && (
+                    (Interrupts.HasFlag(PpuInterrupts.HBlank) && _mode == PpuMode.HBlank) ||
+                    (Interrupts.HasFlag(PpuInterrupts.VBlank) && _mode == PpuMode.VBlank) ||
+                    (Interrupts.HasFlag(PpuInterrupts.OamRead) && _mode == PpuMode.OamRead)
+                )
+            );
+        }
+    }
+
     public PpuControl Control { get; set; }
     public PpuInterrupts Interrupts { get; set; }
-    public PpuMode Mode { get; private set; } = PpuMode.OamRead;
 
-    public byte CurrentLine { get; private set; }
+    public uint CurrentDot { get; set; }
+
+    private byte _currentLine;
+    public byte CurrentLine {
+        get => _currentLine;
+        set {
+            _currentLine = value;
+
+            if (IsLineOnTarget) {
+                interrupt.RequestIf(Interrupts.HasFlag(PpuInterrupts.LineOnTarget));
+            }
+        }
+    }
+
     public byte LineTarget { get; set; }
     public bool IsLineOnTarget => CurrentLine == LineTarget;
 
-    public Point ViewportPos { get; set; }
+    public Point ScrollPos { get; set; }
 
     public Palette BgPalette { get; set; }
     public Palette Obj0Palette { get; set; }
     public Palette Obj1Palette { get; set; }
 
-    private const uint MaxDot = 456;
-    private const uint MaxOamReadDot = 80;
-    private const uint MinRenderDot = 172;
+    private PpuRenderer _renderer;
 
-    private const uint MaxLine = 154;
-    private const uint VBlankLine = 144;
-
-    private uint _currentDot;
-
-    public void Cycle()
+    private static class Dots
     {
-        if (Control.HasFlag(PpuControl.Enable)) {
-            if (_currentDot == 0) {
-                Mode = PpuMode.OamRead;
+        public const uint Disabled = 4;
+        public const uint OamRead  = 80;
+        public const uint Max      = 456;
+    }
+
+    private static class Lines
+    {
+        public const uint VBlank = 144;
+        public const uint Max    = 154;
+    }
+
+    public uint Step()
+    {
+        if (!Control.HasFlag(PpuControl.Enable)) {
+            CurrentDot = 0;
+            _currentLine = 0;
+            _mode = PpuMode.HBlank;
+
+            return Dots.Disabled;
+        }
+
+        if (CurrentDot == 0 && CurrentLine == 0) {
+            Mode = PpuMode.OamRead;
+        }
+
+        return Mode switch {
+            PpuMode.OamRead => OamRead(),
+            PpuMode.Render  => Render(),
+            PpuMode.HBlank  => HBlank(),
+            PpuMode.VBlank  => VBlank(),
+        };
+    }
+
+    private uint OamRead()
+    {
+        Debug.Assert(CurrentDot == 0);
+
+        CurrentDot = Dots.OamRead;
+        Mode = PpuMode.Render;
+        _renderer = new PpuRenderer(this);
+
+        return Dots.OamRead;
+    }
+
+    private uint Render()
+    {
+        var dots = _renderer.Step(out var done);
+        if (done) {
+            Mode = PpuMode.HBlank;
+        }
+
+        CurrentDot += dots;
+        return dots;
+    }
+
+    private struct PpuRenderer(Ppu ppu)
+    {
+        private Point _currentPixel = new(0, ppu.CurrentLine);
+        private Queue<byte> _bgFifo = [];
+
+        private int _currentTileX = 0;
+        private int _fetchStep = 0;
+        private byte _fetchedRowLow = 0;
+        private byte _fetchedRowHigh = 0;
+        private int _toDiscard = 0;
+
+        public uint Step(out bool done)
+        {
+            done = false;
+            var cycles = Fetch();
+            Debug.Assert(cycles > 0);
+
+            for (var i = 0; i < cycles; ++i) {
+                if (_bgFifo.TryDequeue(out var colour)) {
+                    if (_currentPixel.X == 0 && _toDiscard > 0) {
+                        --_toDiscard;
+                        continue;
+                    }
+
+                    var shade =
+                        ppu.Control.HasFlag(PpuControl.BgEnable)
+                            ? ppu.BgPalette[colour]
+                            : Shade.White;
+
+                    ppu.Lcd.Poke(_currentPixel, shade);
+                    ++_currentPixel.X;
+
+                    if (_currentPixel.X == 160) {
+                        done = true;
+                        break;
+                    }
+                }
             }
 
-            var prevMode = Mode;
-            Mode = Mode switch {
-                PpuMode.OamRead => CycleOamRead(),
-                PpuMode.Render  => CycleRender(),
-                PpuMode.HBlank  => CycleHBlank(),
-                PpuMode.VBlank  => CycleVBlank(),
-            };
+            return cycles;
+        }
 
-            UpdateLocations();
-            RequestInterruptsIfNeeded(prevMode);
-            FireVBlankIfNeeded(prevMode);
+        private uint Fetch()
+        {
+            switch (_fetchStep) {
+                case 0: {
+                    // Fetch tile
+                    var tilemap = ppu.Control.HasFlag(PpuControl.BgMap) ? 0x1C00 : 0x1800;
+                    var tileX = (ppu.ScrollPos.X / 8 + _currentTileX) & 0x1F;
+                    var tileY = (ppu.CurrentLine + ppu.ScrollPos.Y) & 0xFF;
+
+                    var address = tilemap + (32 * (tileY / 8) + tileX);
+                    var id = ppu.Vram.Read((ushort)address);
+
+                    var addressMode = ppu.Control.HasFlag(PpuControl.Blocks);
+                    var tileAddress = addressMode ? 0x0000 : 0x1000;
+
+                    var tileLow =
+                        addressMode
+                            ? tileAddress + 16 * id
+                            : tileAddress + 16 * (sbyte)id;
+                    tileLow += 2 * (tileY & 7);
+
+                    var tileHigh = tileLow + 1;
+
+                    _toDiscard = ppu.ScrollPos.X % 8;
+                    _fetchedRowLow = ppu.Vram.Read((ushort)tileLow);
+                    _fetchedRowHigh = ppu.Vram.Read((ushort)tileHigh);
+
+                    _fetchStep = 1;
+                    return 6;
+                }
+
+                case 1: {
+                    // Push row
+                    if (TryEnqueue(_fetchedRowHigh, _fetchedRowLow)) {
+                        ++_currentTileX;
+                        _fetchStep = 0;
+                    }
+
+                    return 1;
+                }
+
+                default: throw new UnreachableException($"Invalid fetch step {_fetchStep}");
+            }
+        }
+
+        private bool TryEnqueue(byte rowHigh, byte rowLow)
+        {
+            if (_bgFifo.Count == 0) {
+                for (var i = 0; i < 8; ++i) {
+                    var partHigh = rowHigh >> 7;
+                    rowHigh <<= 1;
+                    var partLow = rowLow >> 7;
+                    rowLow <<= 1;
+
+                    _bgFifo.Enqueue((byte)((partHigh << 1) | partLow));
+                }
+
+                return true;
+            }
+            else {
+                return false;
+            }
+        }
+    }
+
+    private uint HBlank()
+    {
+        Debug.Assert(CurrentDot < Dots.Max);
+
+        var cycleCount = Dots.Max - CurrentDot;
+
+        CurrentDot = 0;
+        ++CurrentLine;
+
+        if (CurrentLine >= Lines.VBlank) {
+            Mode = PpuMode.VBlank;
+            Lcd.OnVBlank();
         }
         else {
-            Reset();
+            Mode = PpuMode.OamRead;
         }
+
+        return cycleCount;
     }
 
-    private PpuMode CycleOamRead()
+    private uint VBlank()
     {
-        return _currentDot < MaxOamReadDot ? PpuMode.OamRead : PpuMode.Render;
-    }
+        Debug.Assert((uint)CurrentLine is >= Lines.VBlank and < Lines.Max);
 
-    private PpuMode CycleRender()
-    {
-        for (var x = 0; x < ILcd.Width; ++x) {
-            lcd.Poke(new Point(x, 0), Shade.Black);
-            lcd.Poke(new Point(x, ILcd.Height - 1), Shade.Black);
-        }
+        CurrentDot = 0;
+        ++CurrentLine;
 
-        for (var y = 0; y < ILcd.Height; ++y) {
-            lcd.Poke(new Point(0, y), Shade.Black);
-            lcd.Poke(new Point(ILcd.Width - 1, y), Shade.Black);
-        }
-
-        return _currentDot < MinRenderDot ? PpuMode.Render : PpuMode.HBlank;
-    }
-
-    private PpuMode CycleHBlank()
-    {
-        if (_currentDot < MaxDot) {
-            return PpuMode.HBlank;
-        }
-        else if (CurrentLine >= VBlankLine - 1) {
-            return PpuMode.VBlank;
-        }
-        else {
-            return PpuMode.OamRead;
-        }
-    }
-
-    private PpuMode CycleVBlank()
-    {
-        return CurrentLine < MaxLine ? PpuMode.VBlank : PpuMode.OamRead;
-    }
-
-    private void Reset()
-    {
-        _currentDot = 0;
-        CurrentLine = 0;
-        Mode = PpuMode.HBlank;
-    }
-
-    private void UpdateLocations()
-    {
-        ++_currentDot;
-
-        if (_currentDot >= MaxDot) {
-            ++CurrentLine;
-        }
-
-        if (CurrentLine >= MaxLine) {
+        if (CurrentLine == Lines.Max) {
             CurrentLine = 0;
+            Mode = PpuMode.OamRead;
         }
-    }
 
-    private void RequestInterruptsIfNeeded(PpuMode prevMode)
-    {
-        var lyc = Interrupts.HasFlag(PpuInterrupts.IntLyc) && IsLineOnTarget;
-
-        var modeChange =
-            prevMode != Mode &&
-            (Interrupts.HasFlag(PpuInterrupts.IntMode2) && Mode == PpuMode.OamRead ||
-             Interrupts.HasFlag(PpuInterrupts.IntMode1) && Mode == PpuMode.VBlank ||
-             Interrupts.HasFlag(PpuInterrupts.IntMode0) && Mode == PpuMode.HBlank);
-
-        interrupt.RequestIf(lyc || modeChange);
-    }
-
-    private void FireVBlankIfNeeded(PpuMode prevMode)
-    {
-        if (prevMode != PpuMode.VBlank && Mode == PpuMode.VBlank) {
-            lcd.OnVBlank();
-        }
+        return Dots.Max;
     }
 
     public IEnumerable<LocatedMemory> MemoryLayout() => [
@@ -139,13 +263,13 @@ public sealed class Ppu(ILcd lcd, IMemory vram, IMemory oam, InterruptRequester 
         ),
         AccessorMemory.Located(
             0xFF42,
-            () => (byte)ViewportPos.X,
-            it => ViewportPos = ViewportPos with { X = it }
+            () => (byte)ScrollPos.Y,
+            it => ScrollPos = ScrollPos with { Y = it }
         ),
         AccessorMemory.Located(
             0xFF43,
-            () => (byte)ViewportPos.Y,
-            it => ViewportPos = ViewportPos with { Y = it }
+            () => (byte)ScrollPos.X,
+            it => ScrollPos = ScrollPos with { X = it }
         ),
         AccessorMemory.Located(0xFF44, () => CurrentLine, _ => {}),
         AccessorMemory.Located(0xFF45, () => LineTarget, it => LineTarget = it),
@@ -159,6 +283,16 @@ public sealed class Ppu(ILcd lcd, IMemory vram, IMemory oam, InterruptRequester 
             0xFF49,
             Obj1Palette.ToByte,
             it => Obj1Palette = Palette.FromByte(it)
+        ),
+        AccessorMemory.Located(
+            0xFF4A,
+            () => 0,
+            _ => {}
+        ),
+        AccessorMemory.Located(
+            0xFF4B,
+            () => 0,
+            _ => {}
         ),
     ];
 }
@@ -179,10 +313,10 @@ public enum PpuControl : byte
 [Flags]
 public enum PpuInterrupts : byte
 {
-    IntLyc   = 0b0100_0000,
-    IntMode2 = 0b0010_0000,
-    IntMode1 = 0b0001_0000,
-    IntMode0 = 0b0000_1000,
+    LineOnTarget = 0b0100_0000,
+    OamRead      = 0b0010_0000,
+    VBlank       = 0b0001_0000,
+    HBlank       = 0b0000_1000,
 }
 
 public enum PpuMode : byte

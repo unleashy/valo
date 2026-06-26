@@ -18,7 +18,7 @@ public sealed class AvaloniaLcd : CompositionCustomVisualHandler, ILcd, IDisposa
         alphaFormat: AlphaFormat.Opaque
     );
 
-    private readonly uint[] _buffer = new uint[ILcd.Width * ILcd.Height];
+    private readonly uint[,] _buffer = new uint[ILcd.Height, ILcd.Width];
     private bool _needsRender;
 
     public void Poke(Point pixel, Shade shade)
@@ -30,7 +30,7 @@ public sealed class AvaloniaLcd : CompositionCustomVisualHandler, ILcd, IDisposa
             Shade.Black     => Color.FromRgb(0, 0, 0),
         };
 
-        _buffer[pixel.Y * ILcd.Width + pixel.X] = colour.ToUInt32();
+        _buffer[pixel.Y, pixel.X] = colour.ToUInt32();
     }
 
     public void OnVBlank()
