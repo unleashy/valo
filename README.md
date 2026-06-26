@@ -1,6 +1,6 @@
 # VALO
 
-Game Boy emulator
+Game Boy emulator — extremely early dev
 
 ## Development
 
