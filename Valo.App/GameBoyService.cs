@@ -19,13 +19,20 @@ public sealed class GameBoyService(ILcd lcd)
 
         await Task.Run(() => {
             var sw = new Stopwatch();
+            var lag = TimeSpan.Zero;
 
             while (!(ct.IsCancellationRequested || _gameBoy == null)) {
                 sw.Restart();
-
                 _gameBoy.EmulateSingleFrame();
+                var elapsed = sw.Elapsed;
 
-                Sleep.Precisely(msPerFrameTs - sw.Elapsed);
+                lag += elapsed - msPerFrameTs;
+
+                // if lag > 0, we're behind, so skip sleep and let next frames catch up
+                if (lag < TimeSpan.Zero) {
+                    Sleep.Precisely(-lag);
+                    lag = TimeSpan.Zero;
+                }
             }
         }, ct);
     }
@@ -36,6 +43,8 @@ internal static partial class Sleep
 {
     public static void Precisely(TimeSpan span)
     {
+        if (span.Ticks <= 0) return;
+
         var timer = Timer.Value;
         if (timer == 0) {
             // fall back to standard sleep with no high resolution timer
@@ -44,7 +53,7 @@ internal static partial class Sleep
         }
 
         unsafe {
-            var dueTime = new LARGE_INTEGER { QuadPart = -(span.Nanoseconds / 100) };
+            var dueTime = new LARGE_INTEGER { QuadPart = -((long)span.TotalNanoseconds / 100) };
             if (SetWaitableTimerEx(timer, &dueTime, 0, 0, 0, 0, 0)) {
                 _ = WaitForSingleObject(timer, INFINITE);
             }

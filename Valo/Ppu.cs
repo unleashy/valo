@@ -4,11 +4,11 @@ using System.Runtime.CompilerServices;
 
 namespace Valo;
 
-public sealed class Ppu(ILcd lcd, IMemory vram, IMemory oam, InterruptRequester interrupt)
+public sealed class Ppu(ILcd lcd, InterruptRequester interrupt)
 {
     public ILcd Lcd { get; } = lcd;
-    public IMemory Vram { get; } = vram;
-    public IMemory Oam { get; } = oam;
+    public Ram Vram { get; } = new(new byte[0xA000 - 0x8000]);
+    public Ram Oam { get; } = new(new byte[0xFEA0 - 0xFE00]);
 
     private PpuMode _mode = PpuMode.OamRead;
     public PpuMode Mode {
@@ -126,12 +126,17 @@ public sealed class Ppu(ILcd lcd, IMemory vram, IMemory oam, InterruptRequester 
         public uint Step(out bool done)
         {
             done = false;
+
             var cycles = Fetch();
             Debug.Assert(cycles > 0);
 
+            if (_currentPixel.X == 0) {
+                _toDiscard = ppu.ScrollPos.X % 8;
+            }
+
             for (var i = 0; i < cycles; ++i) {
                 if (_bgFifo.TryDequeue(out var colour)) {
-                    if (_currentPixel.X == 0 && _toDiscard > 0) {
+                    if (_toDiscard > 0) {
                         --_toDiscard;
                         continue;
                     }
@@ -177,12 +182,18 @@ public sealed class Ppu(ILcd lcd, IMemory vram, IMemory oam, InterruptRequester 
 
                     var tileHigh = tileLow + 1;
 
-                    _toDiscard = ppu.ScrollPos.X % 8;
                     _fetchedRowLow = ppu.Vram.Read((ushort)tileLow);
                     _fetchedRowHigh = ppu.Vram.Read((ushort)tileHigh);
 
-                    _fetchStep = 1;
-                    return 6;
+                    if (TryEnqueue(_fetchedRowHigh, _fetchedRowLow)) {
+                        ++_currentTileX;
+                        _fetchStep = 0;
+                        return 8;
+                    }
+                    else {
+                        _fetchStep = 1;
+                        return 6;
+                    }
                 }
 
                 case 1: {
@@ -192,7 +203,7 @@ public sealed class Ppu(ILcd lcd, IMemory vram, IMemory oam, InterruptRequester 
                         _fetchStep = 0;
                     }
 
-                    return 1;
+                    return 2;
                 }
 
                 default: throw new UnreachableException($"Invalid fetch step {_fetchStep}");
@@ -255,6 +266,8 @@ public sealed class Ppu(ILcd lcd, IMemory vram, IMemory oam, InterruptRequester 
     }
 
     public IEnumerable<LocatedMemory> MemoryLayout() => [
+        new(0x8000, 0xA000, Vram),
+        new(0xFE00, 0xFEA0, Oam),
         AccessorMemory.Located(0xFF40, () => (byte)Control, it => Control = (PpuControl)it),
         AccessorMemory.Located(
             0xFF41,

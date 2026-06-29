@@ -11,7 +11,7 @@
 
   Title="{x:Static l:Resources.AppTitle}"
   Width="320"
-  Height="288"
+  Height="330"
   MinWidth="160"
   MinHeight="144"
   WindowStartupLocation="CenterScreen"

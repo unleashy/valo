@@ -15,18 +15,16 @@ public sealed class GameBoy(Cpu cpu, Ppu ppu)
 
     public static GameBoy Create(Cartridge cartridge, ILcd lcd)
     {
-        var vram  = Ram.Located(0x8000, 0xA000);
         var wram  = Ram.Located(0xC000, 0xDE00);
         var echo  = new LocatedMemory(0xE000, 0xFE00, wram.Memory);
-        var oam   = Ram.Located(0xFE00, 0xFEA0);
         var hiram = Ram.Located(0xFF80, 0xFFFF);
 
         var interrupts = new InterruptController();
 
-        var ppu = new Ppu(lcd, vram.Memory, oam.Memory, interrupts.RequesterFor(Interrupt.Lcd));
+        var ppu = new Ppu(lcd, interrupts.RequesterFor(Interrupt.Lcd));
 
         var memory = new MappedMemory.Builder()
-            .Map(vram, wram, echo, oam, hiram)
+            .Map(wram, echo, hiram)
             .Map(cartridge.MemoryLayout())
             .Map(ppu.MemoryLayout())
             .Map(interrupts.MemoryLayout())

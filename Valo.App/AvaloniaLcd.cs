@@ -19,7 +19,6 @@ public sealed class AvaloniaLcd : CompositionCustomVisualHandler, ILcd, IDisposa
     );
 
     private readonly uint[,] _buffer = new uint[ILcd.Height, ILcd.Width];
-    private bool _needsRender;
 
     public void Poke(Point pixel, Shade shade)
     {
@@ -44,7 +43,6 @@ public sealed class AvaloniaLcd : CompositionCustomVisualHandler, ILcd, IDisposa
         }
 
         Array.Clear(_buffer);
-        _ = Interlocked.Exchange(ref _needsRender, true);
     }
 
     public override void OnMessage(object message)
@@ -67,10 +65,7 @@ public sealed class AvaloniaLcd : CompositionCustomVisualHandler, ILcd, IDisposa
 
     public override void OnAnimationFrameUpdate()
     {
-        if (Interlocked.Exchange(ref _needsRender, false)) {
-            Invalidate();
-        }
-
+        Invalidate();
         RegisterForNextAnimationFrameUpdate();
     }
 
